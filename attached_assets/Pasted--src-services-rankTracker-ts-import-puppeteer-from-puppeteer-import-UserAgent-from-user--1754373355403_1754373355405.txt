@@ -1,0 +1,76 @@
+// src/services/rankTracker.ts
+import puppeteer from 'puppeteer';
+import { UserAgent } from 'user-agents';
+import cheerio from 'cheerio';
+
+interface RankResult {
+  keyword: string;
+  url: string;
+  position: number;
+  page: number;
+  date: Date;
+}
+
+export class RankTracker {
+  async trackRank(keyword: string, url: string, country: string): Promise<RankResult[]> {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    try {
+      const page = await browser.newPage();
+      const userAgent = new UserAgent({ deviceCategory: 'desktop' });
+      await page.setUserAgent(userAgent.toString());
+      
+      const googleDomain = this.getGoogleDomain(country);
+      const searchUrl = `https://${googleDomain}/search?q=${encodeURIComponent(keyword)}&num=100`;
+      
+      await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+      await page.waitForSelector('div.g', { timeout: 10000 });
+      
+      const html = await page.content();
+      const $ = cheerio.load(html);
+      const results: RankResult[] = [];
+      const cleanTargetUrl = this.cleanUrl(url);
+      
+      $('div.g').each((i, el) => {
+        const resultUrl = $(el).find('a').attr('href');
+        if (resultUrl && this.cleanUrl(resultUrl).includes(cleanTargetUrl)) {
+          results.push({
+            keyword,
+            url: this.cleanUrl(resultUrl),
+            position: i + 1,
+            page: Math.floor(i / 10) + 1,
+            date: new Date()
+          });
+        }
+      });
+      
+      return results;
+    } finally {
+      await browser.close();
+    }
+  }
+  
+  private cleanUrl(url: string): string {
+    try {
+      const parsed = new URL(url);
+      return `${parsed.hostname}${parsed.pathname}`.replace(/\/$/, '');
+    } catch {
+      return url;
+    }
+  }
+  
+  private getGoogleDomain(country: string): string {
+    const domains: Record<string, string> = {
+      'us': 'google.com',
+      'uk': 'google.co.uk',
+      'ca': 'google.ca',
+      'au': 'google.com.au',
+      // Add more country codes as needed
+    };
+    
+    return domains[country.toLowerCase()] || 'google.com';
+  }
+}

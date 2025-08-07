@@ -1,0 +1,556 @@
+import axios from 'axios';
+import * as cheerio from 'cheerio';
+import { JSDOM } from 'jsdom';
+import puppeteer from 'puppeteer';
+import { URL } from 'url';
+
+interface ReferrerData {
+  url: string;
+  domain: string;
+  backlinks: number;
+  domainAuthority: number;
+  firstSeenDate: Date | null;
+  lastSeenDate: Date | null;
+  linkType: 'dofollow' | 'nofollow';
+  anchorText: string;
+  pageTitle: string;
+}
+
+export class TopReferrers {
+  private static instance: TopReferrers;
+  private userAgents: string[];
+  private proxyPool: string[];
+
+  private constructor() {
+    this.userAgents = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    ];
+    this.proxyPool = this.getProxyPool();
+  }
+
+  static getInstance(): TopReferrers {
+    if (!TopReferrers.instance) {
+      TopReferrers.instance = new TopReferrers();
+    }
+    return TopReferrers.instance;
+  }
+
+  private getProxyPool(): string[] {
+    // In a real implementation, you would have actual proxy IPs here
+    // This is just a placeholder structure
+    return [
+      'http://proxy1.example.com:8080',
+      'http://proxy2.example.com:8080',
+      'http://proxy3.example.com:8080'
+    ];
+  }
+
+  private getRandomUserAgent(): string {
+    return this.userAgents[Math.floor(Math.random() * this.userAgents.length)];
+  }
+
+  private getRandomProxy(): string | null {
+    if (this.proxyPool.length === 0) return null;
+    return this.proxyPool[Math.floor(Math.random() * this.proxyPool.length)];
+  }
+
+  private normalizeUrl(url: string): string {
+    try {
+      const urlObj = new URL(url);
+      return `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}`.replace(/\/$/, '');
+    } catch {
+      return url;
+    }
+  }
+
+  private extractDomain(url: string): string {
+    try {
+      const domain = new URL(url).hostname.replace(/^www\./, '');
+      return domain;
+    } catch {
+      return url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+    }
+  }
+
+  async getTopReferrers(targetUrl: string): Promise<ReferrerData[]> {
+    const normalizedUrl = this.normalizeUrl(targetUrl);
+    const targetDomain = this.extractDomain(targetUrl);
+    
+    console.log(`Starting referrer analysis for: ${normalizedUrl}`);
+
+    try {
+      // Multi-source approach for comprehensive results
+      const allReferrers = await this.scrapeMultipleSources(normalizedUrl, targetDomain);
+      
+      // Analyze each referrer for additional data
+      const analyzedReferrers = await this.analyzeReferrers(allReferrers);
+      
+      return analyzedReferrers.sort((a, b) => b.backlinks - a.backlinks);
+    } catch (error) {
+      console.error('Error in getTopReferrers:', error);
+      throw new Error('Failed to retrieve top referrers');
+    }
+  }
+
+  private async scrapeMultipleSources(targetUrl: string, targetDomain: string): Promise<ReferrerData[]> {
+    const referrers: ReferrerData[] = [];
+    
+    // Source 1: Scrape backlinks from Ahrefs (simulated)
+    try {
+      const ahrefsResults = await this.scrapeAhrefs(targetDomain);
+      referrers.push(...ahrefsResults);
+    } catch (error) {
+      console.error('Ahrefs scraping failed:', error);
+    }
+
+    // Source 2: Scrape from Moz (simulated)
+    try {
+      const mozResults = await this.scrapeMoz(targetDomain);
+      referrers.push(...mozResults);
+    } catch (error) {
+      console.error('Moz scraping failed:', error);
+    }
+
+    // Source 3: Scrape from Google search results
+    try {
+      const googleResults = await this.scrapeGoogleReferrers(targetUrl, targetDomain);
+      referrers.push(...googleResults);
+    } catch (error) {
+      console.error('Google scraping failed:', error);
+    }
+
+    // Source 4: Scrape from Bing search results
+    try {
+      const bingResults = await this.scrapeBingReferrers(targetUrl, targetDomain);
+      referrers.push(...bingResults);
+    } catch (error) {
+      console.error('Bing scraping failed:', error);
+    }
+
+    // Deduplicate referrers
+    return this.deduplicateReferrers(referrers);
+  }
+
+  private async scrapeAhrefs(domain: string): Promise<ReferrerData[]> {
+    console.log(`Attempting to scrape Ahrefs data for ${domain}`);
+    
+    // This is a simulation - in a real implementation you would need actual access
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    try {
+      const page = await browser.newPage();
+      await page.setUserAgent(this.getRandomUserAgent());
+      
+      // Simulate Ahrefs backlink check
+      await page.goto('https://ahrefs.com/backlink-checker', { waitUntil: 'networkidle2' });
+      await page.type('input[name="url"]', domain);
+      await page.click('button[type="submit"]');
+      await page.waitForNavigation();
+      
+      // Extract backlinks data
+      const referrers = await page.evaluate(() => {
+        const results: ReferrerData[] = [];
+        const rows = document.querySelectorAll('.backlinks-table tbody tr');
+        
+        rows.forEach(row => {
+          const url = row.querySelector('.url-cell a')?.getAttribute('href');
+          const anchor = row.querySelector('.anchor-cell')?.textContent?.trim();
+          const links = parseInt(row.querySelector('.links-cell')?.textContent?.trim() || '0');
+          const type = row.querySelector('.type-cell')?.textContent?.trim() === 'nofollow' ? 'nofollow' : 'dofollow';
+          
+          if (url) {
+            results.push({
+              url,
+              domain: new URL(url).hostname.replace(/^www\./, ''),
+              backlinks: links,
+              domainAuthority: 0, // Will be filled later
+              firstSeenDate: null,
+              lastSeenDate: null,
+              linkType: type,
+              anchorText: anchor || '',
+              pageTitle: ''
+            });
+          }
+        });
+        
+        return results;
+      });
+      
+      return referrers;
+    } finally {
+      await browser.close();
+    }
+  }
+
+  private async scrapeMoz(domain: string): Promise<ReferrerData[]> {
+    console.log(`Attempting to scrape Moz data for ${domain}`);
+    
+    try {
+      const proxy = this.getRandomProxy();
+      const axiosConfig = proxy ? { 
+        proxy: { host: proxy.split(':')[1].replace('//', ''), port: parseInt(proxy.split(':')[2]) } 
+      } : {};
+      
+      const response = await axios.get(`https://moz.com/link-explorer?site=${domain}`, {
+        headers: {
+          'User-Agent': this.getRandomUserAgent(),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        },
+        ...axiosConfig,
+        timeout: 15000
+      });
+
+      const $ = cheerio.load(response.data);
+      const referrers: ReferrerData[] = [];
+      
+      $('.link-explorer-table tbody tr').each((_, row) => {
+        const url = $(row).find('.url-cell a').attr('href');
+        const anchor = $(row).find('.anchor-cell').text().trim();
+        const links = parseInt($(row).find('.links-cell').text().trim() || '0');
+        const type = $(row).find('.type-cell').text().trim().includes('nofollow') ? 'nofollow' : 'dofollow';
+        
+        if (url) {
+          referrers.push({
+            url,
+            domain: this.extractDomain(url),
+            backlinks: links,
+            domainAuthority: 0,
+            firstSeenDate: null,
+            lastSeenDate: null,
+            linkType: type,
+            anchorText: anchor,
+            pageTitle: $(row).find('.title-cell').text().trim()
+          });
+        }
+      });
+      
+      return referrers;
+    } catch (error) {
+      console.error('Moz scraping error:', error);
+      return [];
+    }
+  }
+
+  private async scrapeGoogleReferrers(targetUrl: string, targetDomain: string): Promise<ReferrerData[]> {
+    console.log(`Scraping Google for referrers to ${targetUrl}`);
+    
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    try {
+      const page = await browser.newPage();
+      await page.setUserAgent(this.getRandomUserAgent());
+      
+      // Search for links to the target URL
+      const searchQuery = `link:${targetUrl} OR link:${targetDomain}`;
+      await page.goto(`https://www.google.com/search?q=${encodeURIComponent(searchQuery)}&num=100`, {
+        waitUntil: 'networkidle2',
+        timeout: 30000
+      });
+      
+      // Extract referring pages
+      const referrers = await page.evaluate((targetDomain) => {
+        const results: ReferrerData[] = [];
+        const seenUrls = new Set<string>();
+        
+        // Multiple selector strategies for better coverage
+        const selectors = [
+          'div.g a[href]',
+          'div[data-ved] a[href]',
+          'div.yuRUbf a[href]',
+          'h3 a[href]',
+          'div[jscontroller] a[href]'
+        ];
+        
+        for (const selector of selectors) {
+          const links = document.querySelectorAll(selector);
+          
+          links.forEach((link) => {
+            const url = (link as HTMLAnchorElement).href;
+            if (url && !url.includes('google.') && !seenUrls.has(url)) {
+              seenUrls.add(url);
+              
+              const domain = new URL(url).hostname.replace(/^www\./, '');
+              const title = (link as HTMLElement).textContent?.trim() || 
+                link.closest('div')?.querySelector('h3')?.textContent?.trim() || '';
+              
+              results.push({
+                url,
+                domain,
+                backlinks: 1, // Will be updated during analysis
+                domainAuthority: 0,
+                firstSeenDate: null,
+                lastSeenDate: null,
+                linkType: 'dofollow', // Assume dofollow unless checked
+                anchorText: '',
+                pageTitle: title
+              });
+            }
+          });
+        }
+        
+        return results;
+      }, targetDomain);
+      
+      return referrers;
+    } finally {
+      await browser.close();
+    }
+  }
+
+  private async scrapeBingReferrers(targetUrl: string, targetDomain: string): Promise<ReferrerData[]> {
+    console.log(`Scraping Bing for referrers to ${targetUrl}`);
+    
+    try {
+      const proxy = this.getRandomProxy();
+      const response = await axios.get(`https://www.bing.com/search?q=link:${encodeURIComponent(targetUrl)}`, {
+        headers: {
+          'User-Agent': this.getRandomUserAgent(),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        },
+        proxy: proxy ? { host: proxy.split(':')[1].replace('//', ''), port: parseInt(proxy.split(':')[2]) } : undefined,
+        timeout: 15000
+      });
+
+      const $ = cheerio.load(response.data);
+      const referrers: ReferrerData[] = [];
+      const seenUrls = new Set<string>();
+      
+      $('li.b_algo').each((_, result) => {
+        const url = $(result).find('h2 a').attr('href');
+        if (url && !seenUrls.has(url)) {
+          seenUrls.add(url);
+          
+          const domain = this.extractDomain(url);
+          const title = $(result).find('h2').text().trim();
+          
+          referrers.push({
+            url,
+            domain,
+            backlinks: 1,
+            domainAuthority: 0,
+            firstSeenDate: null,
+            lastSeenDate: null,
+            linkType: 'dofollow',
+            anchorText: '',
+            pageTitle: title
+          });
+        }
+      });
+      
+      return referrers;
+    } catch (error) {
+      console.error('Bing scraping error:', error);
+      return [];
+    }
+  }
+
+  private deduplicateReferrers(referrers: ReferrerData[]): ReferrerData[] {
+    const unique = new Map<string, ReferrerData>();
+    
+    for (const ref of referrers) {
+      const key = `${ref.domain}-${ref.url}`;
+      if (!unique.has(key)) {
+        unique.set(key, ref);
+      } else {
+        // Sum backlinks for duplicate entries
+        const existing = unique.get(key)!;
+        existing.backlinks += ref.backlinks;
+      }
+    }
+    
+    return Array.from(unique.values());
+  }
+
+  private async analyzeReferrers(referrers: ReferrerData[]): Promise<ReferrerData[]> {
+    const analyzed: ReferrerData[] = [];
+    
+    // Process in batches to avoid rate limiting
+    const batchSize = 5;
+    for (let i = 0; i < referrers.length; i += batchSize) {
+      const batch = referrers.slice(i, i + batchSize);
+      const batchResults = await Promise.all(
+        batch.map(ref => this.analyzeSingleReferrer(ref))
+      );
+      analyzed.push(...batchResults);
+      
+      // Add delay between batches
+      if (i + batchSize < referrers.length) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+    
+    return analyzed;
+  }
+
+  private async analyzeSingleReferrer(referrer: ReferrerData): Promise<ReferrerData> {
+    try {
+      // Get domain authority
+      const da = await this.calculateDomainAuthority(referrer.domain);
+      
+      // Get first seen date
+      const firstSeen = await this.estimateDomainAge(referrer.domain);
+      
+      // Get page title if missing
+      let pageTitle = referrer.pageTitle;
+      if (!pageTitle) {
+        pageTitle = await this.getPageTitle(referrer.url);
+      }
+      
+      // Check if link is nofollow
+      let linkType = referrer.linkType;
+      if (linkType === 'dofollow') {
+        linkType = await this.checkLinkType(referrer.url, referrer.domain);
+      }
+      
+      return {
+        ...referrer,
+        domainAuthority: da,
+        firstSeenDate: firstSeen,
+        lastSeenDate: new Date(), // Assume we just saw it now
+        linkType,
+        pageTitle: pageTitle || referrer.pageTitle
+      };
+    } catch (error) {
+      console.error(`Error analyzing referrer ${referrer.url}:`, error);
+      return referrer; // Return original if analysis fails
+    }
+  }
+
+  private async calculateDomainAuthority(domain: string): Promise<number> {
+    // Simulated domain authority calculation
+    // In a real implementation, you would use Moz API or scrape from Moz
+    
+    try {
+      // Check if it's a known high-authority domain
+      const highAuthorityDomains = [
+        'wikipedia.org', 'github.com', 'youtube.com', 'twitter.com', 
+        'linkedin.com', 'facebook.com', 'medium.com', 'reddit.com'
+      ];
+      
+      if (highAuthorityDomains.some(d => domain.includes(d))) {
+        return Math.floor(Math.random() * 20) + 80; // 80-100
+      }
+      
+      // Check if it's a government/education domain
+      if (domain.endsWith('.gov') || domain.endsWith('.edu')) {
+        return Math.floor(Math.random() * 20) + 70; // 70-90
+      }
+      
+      // Estimate based on domain characteristics
+      const domainLength = domain.length;
+      const domainAge = await this.estimateDomainAge(domain);
+      
+      let da = 30; // Base score
+      
+      // Older domains have higher DA
+      if (domainAge && (new Date().getFullYear() - domainAge.getFullYear()) > 10) {
+        da += 30;
+      } else if (domainAge && (new Date().getFullYear() - domainAge.getFullYear()) > 5) {
+        da += 20;
+      }
+      
+      // Shorter domains have higher DA
+      if (domainLength < 10) da += 10;
+      else if (domainLength < 15) da += 5;
+      
+      // Add some randomness
+      da += Math.floor(Math.random() * 10);
+      
+      return Math.min(Math.max(da, 1), 100);
+    } catch (error) {
+      console.error('Error calculating domain authority:', error);
+      return 30; // Default fallback
+    }
+  }
+
+  private async estimateDomainAge(domain: string): Promise<Date | null> {
+    try {
+      // Try WHOIS lookup
+      const response = await axios.get(`https://www.whois.com/whois/${domain}`, {
+        headers: { 'User-Agent': this.getRandomUserAgent() },
+        timeout: 10000
+      });
+      
+      const $ = cheerio.load(response.data);
+      const whoisText = $('.df-raw').text() || $('.whois-data').text();
+      
+      // Parse creation date from WHOIS
+      const creationDateMatch = whoisText.match(/Creation Date: (\d{4}-\d{2}-\d{2})/);
+      if (creationDateMatch) {
+        return new Date(creationDateMatch[1]);
+      }
+      
+      // Fallback to archive.org check
+      const archiveResponse = await axios.get(`https://web.archive.org/cdx/search/cdx?url=${domain}&output=json`, {
+        headers: { 'User-Agent': this.getRandomUserAgent() },
+        timeout: 10000
+      });
+      
+      if (Array.isArray(archiveResponse.data) {
+        const firstCapture = archiveResponse.data[1]; // First row after headers
+        if (firstCapture && firstCapture[1]) {
+          const timestamp = firstCapture[1];
+          const year = timestamp.substring(0, 4);
+          const month = timestamp.substring(4, 6);
+          const day = timestamp.substring(6, 8);
+          return new Date(`${year}-${month}-${day}`);
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      console.error('Error estimating domain age:', error);
+      return null;
+    }
+  }
+
+  private async getPageTitle(url: string): Promise<string> {
+    try {
+      const response = await axios.get(url, {
+        headers: { 'User-Agent': this.getRandomUserAgent() },
+        timeout: 10000,
+        maxRedirects: 5
+      });
+      
+      const $ = cheerio.load(response.data);
+      return $('title').text().trim();
+    } catch (error) {
+      console.error('Error getting page title:', error);
+      return '';
+    }
+  }
+
+  private async checkLinkType(url: string, targetDomain: string): Promise<'dofollow' | 'nofollow'> {
+    try {
+      const response = await axios.get(url, {
+        headers: { 'User-Agent': this.getRandomUserAgent() },
+        timeout: 10000,
+        maxRedirects: 5
+      });
+      
+      const $ = cheerio.load(response.data);
+      let isNofollow = false;
+      
+      $(`a[href*="${targetDomain}"]`).each((_, el) => {
+        const rel = $(el).attr('rel');
+        if (rel && rel.includes('nofollow')) {
+          isNofollow = true;
+          return false; // Break loop
+        }
+      });
+      
+      return isNofollow ? 'nofollow' : 'dofollow';
+    } catch (error) {
+      console.error('Error checking link type:', error);
+      return 'dofollow'; // Assume dofollow if check fails
+    }
+  }
+}

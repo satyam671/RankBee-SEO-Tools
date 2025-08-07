@@ -1,0 +1,153 @@
+// src/rankTracker.ts
+import express from 'express';
+import axios from 'axios';
+import cheerio from 'cheerio';
+import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const PORT = 3000;
+const HISTORY_FILE = path.join(__dirname, 'rank-history.json');
+
+interface RankResult {
+  keyword: string;
+  domain: string;
+  searchEngine: string;
+  rank: number | null;
+  top3: boolean;
+  top20: boolean;
+  firstPage: boolean;
+  visibility: 'easy' | 'medium' | 'hard';
+  matchedUrl?: string;
+  timestamp: string;
+}
+
+function normalizeDomain(domain: string): string {
+  try {
+    const url = new URL(domain.startsWith('http') ? domain : `https://${domain}`);
+    return url.hostname.replace(/^www\./, '');
+  } catch {
+    return domain.replace(/^https?:\/\//, '').replace(/^www\./, '');
+  }
+}
+
+async function fetchDuckDuckGoSERP(keyword: string): Promise<string[]> {
+  const searchUrl = `https://duckduckgo.com/html/?q=${encodeURIComponent(keyword)}`;
+  const { data: html } = await axios.get(searchUrl, {
+    headers: {
+      'User-Agent': randomUserAgent(),
+      'Referer': 'https://duckduckgo.com/',
+    }
+  });
+
+  const $ = cheerio.load(html);
+  const links: string[] = [];
+
+  $('a.result__a').each((_, el) => {
+    const href = $(el).attr('href');
+    if (href && href.startsWith('http')) {
+      links.push(href.split('&')[0]);
+    }
+  });
+
+  return [...new Set(links)].slice(0, 50);
+}
+
+function randomUserAgent(): string {
+  const agents = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
+    'Mozilla/5.0 (X11; Linux x86_64)',
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)',
+    'Mozilla/5.0 (Android 11; Mobile; rv:89.0)'
+  ];
+  return agents[Math.floor(Math.random() * agents.length)];
+}
+
+function analyzeRank(domain: string, links: string[], keyword: string, engine: string): RankResult {
+  const normalizedDomain = normalizeDomain(domain);
+  const matchedIndex = links.findIndex(link => normalizeDomain(link).includes(normalizedDomain));
+  const matchedUrl = links.find(link => normalizeDomain(link).includes(normalizedDomain));
+  const rank = matchedIndex >= 0 ? matchedIndex + 1 : null;
+
+  let visibility: 'easy' | 'medium' | 'hard' = 'hard';
+  if (rank && rank <= 5) visibility = 'easy';
+  else if (rank && rank <= 20) visibility = 'medium';
+
+  return {
+    keyword,
+    domain: normalizedDomain,
+    searchEngine: engine,
+    rank,
+    top3: rank !== null && rank <= 3,
+    top20: rank !== null && rank <= 20,
+    firstPage: rank !== null && rank <= 10,
+    visibility,
+    matchedUrl,
+    timestamp: new Date().toISOString()
+  };
+}
+
+function saveToHistory(results: RankResult[]) {
+  let history: RankResult[] = [];
+  try {
+    if (fs.existsSync(HISTORY_FILE)) {
+      const raw = fs.readFileSync(HISTORY_FILE, 'utf-8');
+      history = JSON.parse(raw);
+    }
+  } catch (err) {
+    console.error('Failed to read history file:', err.message);
+  }
+
+  history.push(...results);
+  fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
+}
+
+app.post('/track-rank', async (req, res) => {
+  const { domain, keywords, searchEngine } = req.body;
+
+  if (!domain || !Array.isArray(keywords) || !searchEngine) {
+    return res.status(400).json({ error: 'Missing domain, keywords array, or search engine' });
+  }
+
+  try {
+    const results: RankResult[] = [];
+
+    for (const keyword of keywords) {
+      let links: string[] = [];
+
+      if (searchEngine === 'duckduckgo') {
+        links = await fetchDuckDuckGoSERP(keyword);
+      } else {
+        return res.status(400).json({ error: 'Only DuckDuckGo is supported in this version. Use SerpAPI for Google/Bing.' });
+      }
+
+      const result = analyzeRank(domain, links, keyword, searchEngine);
+      results.push(result);
+    }
+
+    saveToHistory(results);
+    res.json({ results });
+  } catch (error) {
+    console.error('Rank tracking error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch SERPs or analyze ranks' });
+  }
+});
+
+app.get('/rank-history', (req, res) => {
+  try {
+    const raw = fs.readFileSync(HISTORY_FILE, 'utf-8');
+    const history: RankResult[] = JSON.parse(raw);
+    res.json({ history });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load rank history' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`🛡️ Privacy-first Rank Tracker running at http://localhost:${PORT}`);
+});

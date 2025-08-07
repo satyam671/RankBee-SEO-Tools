@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RankBee - Professional SEO Tools Suite</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script>
+    tailwind.config = {
+        theme: {
+            extend: {
+                fontFamily: {
+                    'roboto': ['Roboto', 'sans-serif'],
+                },
+                colors: {
+                    'material-blue': '#1976D2',
+                    'material-blue-dark': '#1565C0',
+                    'amber': '#FFC107',
+                    'amber-dark': '#FF8F00',
+                    'surface': '#FFFFFF',
+                    'background': '#F5F5F5',
+                    'text-primary': '#212121',
+                    'text-secondary': '#757575',
+                }
+            }
+        }
+    };
+    </script>
+    <style>
+        .card-elevation {
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1), 0 8px 16px rgba(0,0,0,0.1);
+            transition: box-shadow 0.3s ease;
+        }
+        .card-elevation:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15), 0 16px 32px rgba(0,0,0,0.15);
+        }
+        .ripple-effect {
+            position: relative;
+            overflow: hidden;
+        }
+        .ripple-effect::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.3s, height 0.3s;
+        }
+        .ripple-effect:active::after {
+            width: 300px;
+            height: 300px;
+        }
+        .loading-skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s infinite;
+        }
+        @keyframes loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+<body class="font-roboto bg-background min-h-screen">
+    <!-- Authentication Modal (Hidden by default) -->
+    <div id="authModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-surface rounded-lg card-elevation max-w-md w-full p-6">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-medium text-text-primary">Sign In to RankBee</h2>
+                <button onclick="closeAuthModal()" class="text-text-secondary hover:text-text-primary">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <form class="space-y-4">
+                <div>
+                    <label for="email" class="block text-sm font-medium text-text-primary mb-1">Email</label>
+                    <input type="email" id="email" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-material-blue focus:border-transparent" placeholder="your@email.com">
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-text-primary mb-1">Password</label>
+                    <input type="password" id="password" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-material-blue focus:border-transparent" placeholder="••••••••">
+                </div>
+                <button type="submit" class="w-full bg-material-blue text-white py-2 px-4 rounded-md ripple-effect hover:bg-material-blue-dark transition-colors duration-200">
+                    Sign In
+                </button>
+                <p class="text-center text-sm text-text-secondary">
+                    Don't have an account? <a href="#" class="text-material-blue hover:underline">Sign up</a>
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="bg-surface card-elevation sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Logo and Tagline -->
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-10 h-10 bg-amber rounded-full flex items-center justify-center">
+                            <span class="material-icons text-white">insights</span>
+                        </div>
+                        <div>
+                            <h1 class="text-xl font-bold text-text-primary">RankBee</h1>
+                            <p class="text-xs text-text-secondary">Professional SEO Tools Suite</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <nav class="hidden md:flex items-center space-x-6">
+                    <a href="#tools" class="text-text-secondary hover:text-material-blue transition-colors">Tools</a>
+                    <a href="#pricing" class="text-text-secondary hover:text-material-blue transition-colors">Pricing</a>
+                    <a href="#docs" class="text-text-secondary hover:text-material-blue transition-colors">Docs</a>
+                    <button onclick="openAuthModal()" class="bg-material-blue text-white px-4 py-2 rounded-md ripple-effect hover:bg-material-blue-dark transition-colors">
+                        Sign In
+                    </button>
+                </nav>
+
+                <!-- Mobile Menu Button -->
+                <button class="md:hidden text-text-secondary hover:text-text-primary">
+                    <span class="material-icons">menu</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="bg-gradient-to-b from-material-blue to-material-blue-dark text-white py-16">
+        <!-- Professional SEO workspace with multiple monitors showing analytics -->
+        <div class="absolute inset-0 opacity-10" style="background-image: url('https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&h=800'); background-size: cover; background-position: center;"></div>
+        <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h2 class="text-4xl md:text-6xl font-bold mb-6">Boost Your SEO Rankings</h2>
+            <p class="text-xl md:text-2xl mb-8 opacity-90">Professional-grade SEO tools for keyword research, site analysis, and rank tracking</p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <button class="bg-amber text-material-blue px-8 py-3 rounded-md font-medium ripple-effect hover:bg-amber-dark transition-colors">
+                    Start Free Analysis
+                </button>
+                <button class="border border-white text-white px-8 py-3 rounded-md font-medium ripple-effect hover:bg-white hover:text-material-blue transition-colors">
+                    View Demo
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Tools Grid -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16" id="tools">
+        <div class="text-center mb-12">
+            <h3 class="text-3xl font-bold text-text-primary mb-4">Complete SEO Toolkit</h3>
+            <p class="text-lg text-text-secondary">Everything you need to optimize your website and track your rankings</p>
+        </div>
+
+        <!-- Tools Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+            <!-- Keyword Research Tool -->
+            <div class="bg-surface rounded-lg card-elevation p-6 hover:scale-105 transition-transform cursor-pointer" onclick="openTool('keyword-research')">
+                <div class="flex items-center mb-4">
+                    <div class="w-12 h-12 bg-material-blue rounded-lg flex items-center justify-center mr-4">
+                        <span class="material-icons text-white">search</span>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-text-primary">Keyword Research</h4>
+                        <p class="text-sm text-text-secondary">Most Popular</p>
+                    </div>
+                </div>
+                <p class="text-text-secondary mb-4">Generate keyword suggestions and search volume estimates for your content strategy.</p>
+                <div class="flex items-center text-sm text-material-blue">
+                    <span>Try Now</span>
+                    <span class="material-icons ml-1">arrow_forward</span>
+                </div>
+            </div>
+
+            <!-- Domain Authority Checker -->
+            <div class="bg-surface rounded-lg card-elevation p-6 hover:scale-105 transition-transform cursor-pointer" onclick="openTool('domain-authority')">
+                <div class="flex items-center mb-4">
+                    <div class="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center mr-4">
+                        <span class="material-icons text-white">verified</span>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-text-primary">Domain Authority</h4>
+                        <p class="text-sm text-text-secondary">Essential</p>
+                    </div>
+                </div>
+                <p class="text-text-secondary mb-4">Check domain and page authority scores to measure website credibility.</p>
+                <div class="flex items-center text-sm text-green-500">
+                    <span>Check Authority</span>
+                    <span class="material-icons ml-1">arrow_forward</span>
+                </div>
+            </div>
+
+            <!-- Backlink Analyzer -->
+            <div class="bg-surface rounded-lg card-elevation p-6 hover:scale-105 transition-transform cursor-pointer" onclick="openTool('backlink-analyzer')">
+                <div class="flex items-center mb-4">
+                    <div class="w-12 h-12 bg-purple-500 rounded-lg flex items-center justify-center mr-4">
+                        <span class="material-icons text-white">link</span>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-text-primary">Backlink Analyzer</h4>
+                        <p class="text-sm text-text-secondary">Advanced</p>
+                    </div>
+                </div>
+                <p class="text-text-secondary mb-4">Discover and analyze backlinks to understand your link profile.</p>
+                <div class="flex items-center text-sm text-purple-500">
+                    <span>Analyze Links</span>
+                    <span class="material-icons ml-1">arrow_forward</span>
+                </div>
+            </div>
+
+            <!-- Keyword Density Analyzer -->
+            <div class="bg-surface rounded-lg card-elevation p-6 hover:scale-105 transition-transform cursor-pointer" onclick="openTool('keyword-density')">
+                <div class="flex items-center mb-4">
+                    <div class="w-12 h-12 bg-orange-500 rounded-lg flex items-center justify-center mr-4">
+                        <span class="material-icons text-white">analytics</span>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-text-primary">Keyword Density</h4>
+                        <p class="text-sm text-text-secondary">Content</p>
+                    </div>
+                </div>
+                <p class="text-text-secondary mb-4">Calculate keyword frequency and density percentages in your content.</p>
+                <div class="flex items-center text-sm text-orange-500">
+                    <span>Analyze Content</span>
+                    <span class="material-icons ml-1">arrow_forward</span>
+                </div>
+            </div>
+
+            <!-- Meta Tags Extractor -->
+            <div class="bg-surface rounded-lg card-elevation p-6 hover:scale-105 transition-transform cursor-pointer" onclick="openTool('meta-tags')">
+                <div class="flex items-center mb-4">
+                    <div class="w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center mr-4">
+                        <span class="material-icons text-white">code</span>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-text-primary">Meta Tags Extractor</h4>
+                        <p class="text-sm text-text-secondary">Technical</p>
+                    </div>
+                </div>
+                <p class="text-text-secondary mb-4">Extract and analyze meta titles, descriptions, and tags from any webpage.</p>
+                <div class="flex items-center text-sm text-red-500">
+                    <span>Extract Meta</span>
+                    <span class="material-icons ml-1">arrow_forward</span>
+                </div>
+            </div>
+
+            <!-- Rank Tracker -->
+            <div class="bg-surface rounded-lg card-elevation p-6 hover:scale-105 transition-transform cursor-pointer" onclick="openTool('rank-tracker')">
+                <div class="flex items-center mb-4">
+                    <div class="w-12 h-12 bg-amber rounded-lg flex items-center justify-center mr-4">
+                        <span class="material-icons text-white">trending_up</span>
+                    </div>
+                    <div>
+                        <h4 class="text-lg font-medium text-text-primary">Rank Tracker</h4>
+                        <p class="text-sm text-text-secondary">Monitoring</p>
+                    </div>
+                </div>
+                <p class="text-text-secondary mb-4">Track your keyword rankings across different search engines.</p>
+                <div class="flex items-center text-sm text-amber-dark">
+                    <span>Track Rankings</span>
+                    <span class="material-icons ml-1">arrow_forward</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Tool Interface Modal -->
+    <div id="toolModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+        <div class="flex items-center justify-center min-h-screen p-4">
+            <div class="bg-surface rounded-lg card-elevation max-w-4xl w-full max-h-[90vh] overflow-hidden">
+                <!-- Modal Header -->
+                <div class="flex justify-between items-center p-6 border-b border-gray-200">
+                    <div class="flex items-center space-x-3">
+                        <div id="toolIcon" class="w-10 h-10 bg-material-blue rounded-lg flex items-center justify-center">
+                            <span class="material-icons text-white">search</span>
+                        </div>
+                        <div>
+                            <h3 id="toolTitle" class="text-xl font-medium text-text-primary">Keyword Research Tool</h3>
+                            <p id="toolDescription" class="text-sm text-text-secondary">Generate keyword suggestions and analyze search volume</p>
+                        </div>
+                    </div>
+                    <button onclick="closeTool()" class="text-text-secondary hover:text-text-primary">
+                        <span class="material-icons">close</span>
+                    </button>
+                </div>
+
+                <!-- Tool Content -->
+                <div class="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                    <!-- Keyword Research Tool Interface -->
+                    <div id="keyword-research-content" class="tool-content">
+                        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <!-- Input Section -->
+                            <div class="lg:col-span-1">
+                                <div class="bg-gray-50 rounded-lg p-4 mb-6">
+                                    <h4 class="font-medium text-text-primary mb-4">Search Parameters</h4>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-text-primary mb-1">Seed Keyword</label>
+                                            <input type="text" placeholder="e.g., digital marketing" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-material-blue">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-text-primary mb-1">Location</label>
+                                            <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-material-blue">
+                                                <option>United States</option>
+                                                <option>United Kingdom</option>
+                                                <option>Canada</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-text-primary mb-1">Language</label>
+                                            <select class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-material-blue">
+                                                <option>English</option>
+                                                <option>Spanish</option>
+                                                <option>French</option>
+                                            </select>
+                                        </div>
+                                        <button class="w-full bg-material-blue text-white py-2 px-4 rounded-md ripple-effect hover:bg-material-blue-dark transition-colors">
+                                            Generate Keywords
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Results Section -->
+                            <div class="lg:col-span-2">
+                                <div class="bg-gray-50 rounded-lg p-4">
+                                    <div class="flex justify-between items-center mb-4">
+                                        <h4 class="font-medium text-text-primary">Keyword Suggestions</h4>
+                                        <div class="flex space-x-2">
+                                            <button class="px-3 py-1 text-xs bg-material-blue text-white rounded-full">Export CSV</button>
+                                            <button class="px-3 py-1 text-xs border border-material-blue text-material-blue rounded-full">Save List</button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Sample Results Table -->
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-sm">
+                                            <thead>
+                                                <tr class="border-b border-gray-200">
+                                                    <th class="text-left py-2 font-medium">Keyword</th>
+                                                    <th class="text-left py-2 font-medium">Volume</th>
+                                                    <th class="text-left py-2 font-medium">Difficulty</th>
+                                                    <th class="text-left py-2 font-medium">CPC</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-100">
+                                                <tr>
+                                                    <td class="py-2 font-medium">digital marketing strategy</td>
+                                                    <td class="py-2">12,100</td>
+                                                    <td class="py-2"><span class="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Easy</span></td>
+                                                    <td class="py-2">$3.45</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="py-2 font-medium">digital marketing tools</td>
+                                                    <td class="py-2">8,900</td>
+                                                    <td class="py-2"><span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Medium</span></td>
+                                                    <td class="py-2">$4.12</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="py-2 font-medium">digital marketing agency</td>
+                                                    <td class="py-2">15,600</td>
+                                                    <td class="py-2"><span class="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">Hard</span></td>
+                                                    <td class="py-2">$7.89</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Domain Authority Tool Interface -->
+                    <div id="domain-authority-content" class="tool-content hidden">
+                        <div class="max-w-2xl mx-auto">
+                            <div class="text-center mb-8">
+                                <!-- Analytics dashboard showing SEO metrics and domain authority scores -->
+                                <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=400" alt="SEO analytics dashboard" class="rounded-lg shadow-lg w-full h-48 object-cover mb-4">
+                                <div class="bg-gray-50 rounded-lg p-6">
+                                    <h4 class="font-medium text-text-primary mb-4">Domain Authority Checker</h4>
+                                    <div class="flex gap-4 mb-4">
+                                        <input type="url" placeholder="https://example.com" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-material-blue">
+                                        <button class="bg-green-500 text-white px-6 py-2 rounded-md ripple-effect hover:bg-green-600 transition-colors">
+                                            Check Authority
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Sample Results -->
+                                    <div class="grid grid-cols-2 gap-4 mt-6">
+                                        <div class="text-center p-4 bg-white rounded-lg border">
+                                            <div class="text-3xl font-bold text-green-500 mb-2">78</div>
+                                            <div class="text-sm text-text-secondary">Domain Authority</div>
+                                        </div>
+                                        <div class="text-center p-4 bg-white rounded-lg border">
+                                            <div class="text-3xl font-bold text-material-blue mb-2">65</div>
+                                            <div class="text-sm text-text-secondary">Page Authority</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Other tool contents would be similar structured interfaces -->
+                    <div id="backlink-analyzer-content" class="tool-content hidden">
+                        <div class="text-center p-8">
+                            <span class="material-icons text-6xl text-purple-500 mb-4">link</span>
+                            <h4 class="text-xl font-medium text-text-primary mb-2">Backlink Analyzer</h4>
+                            <p class="text-text-secondary">Enter a domain to analyze its backlink profile</p>
+                        </div>
+                    </div>
+
+                    <div id="keyword-density-content" class="tool-content hidden">
+                        <div class="text-center p-8">
+                            <span class="material-icons text-6xl text-orange-500 mb-4">analytics</span>
+                            <h4 class="text-xl font-medium text-text-primary mb-2">Keyword Density Analyzer</h4>
+                            <p class="text-text-secondary">Paste your content to analyze keyword density</p>
+                        </div>
+                    </div>
+
+                    <div id="meta-tags-content" class="tool-content hidden">
+                        <div class="max-w-2xl mx-auto">
+                            <!-- Website analysis tools and code snippets -->
+                            <img src="https://images.unsplash.com/photo-1555066931-4365d14bab8c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=400" alt="Website code analysis" class="rounded-lg shadow-lg w-full h-48 object-cover mb-6">
+                            <div class="bg-gray-50 rounded-lg p-6">
+                                <h4 class="font-medium text-text-primary mb-4">Meta Tags Extractor</h4>
+                                <div class="flex gap-4 mb-4">
+                                    <input type="url" placeholder="https://example.com" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-material-blue">
+                                    <button class="bg-red-500 text-white px-6 py-2 rounded-md ripple-effect hover:bg-red-600 transition-colors">
+                                        Extract Meta Tags
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="rank-tracker-content" class="tool-content hidden">
+                        <div class="text-center p-8">
+                            <!-- SEO ranking charts and keyword position tracking -->
+                            <img src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&h=400" alt="SEO ranking analytics dashboard" class="rounded-lg shadow-lg w-full h-48 object-cover mb-6">
+                            <h4 class="text-xl font-medium text-text-primary mb-2">Rank Tracker</h4>
+                            <p class="text-text-secondary">Monitor your keyword rankings across search engines</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features Section -->
+    <section class="bg-surface py-16">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h3 class="text-3xl font-bold text-text-primary mb-4">Why Choose RankBee?</h3>
+                <p class="text-lg text-text-secondary">Professional-grade SEO tools with real-time analysis</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-material-blue rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="material-icons text-white text-2xl">speed</span>
+                    </div>
+                    <h4 class="text-xl font-medium text-text-primary mb-2">Real-Time Analysis</h4>
+                    <p class="text-text-secondary">Get instant results without waiting for scheduled reports</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="material-icons text-white text-2xl">security</span>
+                    </div>
+                    <h4 class="text-xl font-medium text-text-primary mb-2">Privacy First</h4>
+                    <p class="text-text-secondary">Your data stays secure with our privacy-focused approach</p>
+                </div>
+                
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-amber rounded-full flex items-center justify-center mx-auto mb-4">
+                        <span class="material-icons text-white text-2xl">trending_up</span>
+                    </div>
+                    <h4 class="text-xl font-medium text-text-primary mb-2">Accurate Results</h4>
+                    <p class="text-text-secondary">Advanced algorithms provide reliable SEO insights</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-text-primary text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div class="col-span-1 md:col-span-2">
+                    <div class="flex items-center space-x-2 mb-4">
+                        <div class="w-8 h-8 bg-amber rounded-full flex items-center justify-center">
+                            <span class="material-icons text-white text-sm">insights</span>
+                        </div>
+                        <h5 class="text-lg font-bold">RankBee</h5>
+                    </div>
+                    <p class="text-gray-300 mb-4">Professional SEO tools suite for businesses and agencies. Boost your rankings with our comprehensive toolkit.</p>
+                </div>
+                
+                <div>
+                    <h6 class="font-medium mb-4">Quick Links</h6>
+                    <ul class="space-y-2 text-sm text-gray-300">
+                        <li><a href="#" class="hover:text-amber transition-colors">About Us</a></li>
+                        <li><a href="#" class="hover:text-amber transition-colors">Privacy Policy</a></li>
+                        <li><a href="#" class="hover:text-amber transition-colors">Terms of Service</a></li>
+                        <li><a href="#" class="hover:text-amber transition-colors">Contact</a></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h6 class="font-medium mb-4">Support</h6>
+                    <ul class="space-y-2 text-sm text-gray-300">
+                        <li><a href="#" class="hover:text-amber transition-colors">Documentation</a></li>        
+                        <li><a href="#" class="hover:text-amber transition-colors">API Reference</a></li>
+                        <li><a href="#" class="hover:text-amber transition-colors">Help Center</a></li>
+                        <li><a href="#" class="hover:text-amber transition-colors">Disclaimer</a></li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="border-t border-gray-700 mt-8 pt-8 text-center">
+                <p class="text-sm text-gray-300">© 2024 RankBee. All rights reserved. Professional SEO Tools Suite.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Authentication Modal Functions
+        function openAuthModal() {
+            document.getElementById('authModal').classList.remove('hidden');
+        }
+
+        function closeAuthModal() {
+            document.getElementById('authModal').classList.add('hidden');
+        }
+
+        // Tool Modal Functions
+        function openTool(toolId) {
+            const modal = document.getElementById('toolModal');
+            const toolData = {
+                'keyword-research': {
+                    title: 'Keyword Research Tool',
+                    description: 'Generate keyword suggestions and analyze search volume',
+                    icon: 'search',
+                    color: 'bg-material-blue'
+                },
+                'domain-authority': {
+                    title: 'Domain Authority Checker',
+                    description: 'Check domain and page authority scores',
+                    icon: 'verified',
+                    color: 'bg-green-500'
+                },
+                'backlink-analyzer': {
+                    title: 'Backlink Analyzer',
+                    description: 'Discover and analyze backlinks',
+                    icon: 'link',
+                    color: 'bg-purple-500'
+                },
+                'keyword-density': {
+                    title: 'Keyword Density Analyzer',
+                    description: 'Calculate keyword frequency and density',
+                    icon: 'analytics',
+                    color: 'bg-orange-500'
+                },
+                'meta-tags': {
+                    title: 'Meta Tags Extractor',
+                    description: 'Extract and analyze meta titles and descriptions',
+                    icon: 'code',
+                    color: 'bg-red-500'
+                },
+                'rank-tracker': {
+                    title: 'Rank Tracker',
+                    description: 'Track keyword rankings across search engines',
+                    icon: 'trending_up',
+                    color: 'bg-amber'
+                }
+            };
+
+            const tool = toolData[toolId];
+            if (tool) {
+                document.getElementById('toolTitle').textContent = tool.title;
+                document.getElementById('toolDescription').textContent = tool.description;
+                document.getElementById('toolIcon').className = `w-10 h-10 ${tool.color} rounded-lg flex items-center justify-center`;
+                document.getElementById('toolIcon').innerHTML = `<span class="material-icons text-white">${tool.icon}</span>`;
+
+                // Hide all tool contents
+                document.querySelectorAll('.tool-content').forEach(content => {
+                    content.classList.add('hidden');
+                });
+
+                // Show selected tool content
+                const contentElement = document.getElementById(`${toolId}-content`);
+                if (contentElement) {
+                    contentElement.classList.remove('hidden');
+                }
+
+                modal.classList.remove('hidden');
+                
+                // TODO: Load tool-specific data and functionality
+                // TODO: Initialize form validation and API calls
+            }
+        }
+
+        function closeTool() {
+            document.getElementById('toolModal').classList.add('hidden');
+        }
+
+        // Close modals when clicking outside
+        document.getElementById('authModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeAuthModal();
+            }
+        });
+
+        document.getElementById('toolModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeTool();
+            }
+        });
+
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // TODO: Implement real-time scraping and analysis functionality
+        // TODO: Add form validation and error handling
+        // TODO: Integrate JWT authentication and user management
+        // TODO: Add caching layer for improved performance
+        // TODO: Implement export functionality for results
+    </script>
+</body>
+</html>

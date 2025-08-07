@@ -1,0 +1,124 @@
+// src/backlinkAnalyzer.ts
+import express from 'express';
+import axios from 'axios';
+import cheerio from 'cheerio';
+import cors from 'cors';
+import NodeCache from 'node-cache';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const PORT = 3000;
+const cache = new NodeCache({ stdTTL: 3600 }); // 1 hour cache
+
+interface LinkDetail {
+  url: string;
+  type: 'internal' | 'external';
+  rel: string[];
+}
+
+interface AnalysisResult {
+  totalLinks: number;
+  internalLinks: LinkDetail[];
+  externalLinks: LinkDetail[];
+  backlinksEstimate: number;
+  linkedFrom: string[];
+  performance: {
+    speedScore: number;
+    mobileFriendly: boolean;
+  };
+}
+
+function classifyLink(href: string, baseDomain: string): 'internal' | 'external' {
+  try {
+    const url = new URL(href, `https://${baseDomain}`);
+    return url.hostname === baseDomain ? 'internal' : 'external';
+  } catch {
+    return 'external';
+  }
+}
+
+function extractRelAttributes(el: cheerio.Element, $: cheerio.CheerioAPI): string[] {
+  const rel = $(el).attr('rel');
+  return rel ? rel.split(' ') : [];
+}
+
+async function estimateBacklinks(domain: string): Promise<string[]> {
+  try {
+    const googleSearchURL = `https://www.google.com/search?q=link:${domain}`;
+    const { data: html } = await axios.get(googleSearchURL, {
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    const $ = cheerio.load(html);
+    const links: string[] = [];
+    $('a').each((_, el) => {
+      const href = $(el).attr('href');
+      if (href && href.includes(domain)) links.push(href);
+    });
+    return [...new Set(links)];
+  } catch {
+    return [];
+  }
+}
+
+function mockPerformanceMetrics(): { speedScore: number; mobileFriendly: boolean } {
+  return {
+    speedScore: Math.floor(Math.random() * 50) + 50, // 50–100
+    mobileFriendly: Math.random() > 0.3
+  };
+}
+
+app.post('/analyze-links', async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'Missing URL' });
+
+  const domain = new URL(url).hostname;
+
+  // Check cache
+  const cached = cache.get<AnalysisResult>(url);
+  if (cached) return res.json({ ...cached, cached: true });
+
+  try {
+    const { data: html } = await axios.get(url);
+    const $ = cheerio.load(html);
+
+    const internalLinks: LinkDetail[] = [];
+    const externalLinks: LinkDetail[] = [];
+
+    $('a').each((_, el) => {
+      const href = $(el).attr('href');
+      if (!href) return;
+
+      const type = classifyLink(href, domain);
+      const rel = extractRelAttributes(el, $);
+      const fullUrl = new URL(href, `https://${domain}`).href;
+
+      const linkDetail: LinkDetail = { url: fullUrl, type, rel };
+
+      type === 'internal' ? internalLinks.push(linkDetail) : externalLinks.push(linkDetail);
+    });
+
+    const linkedFrom = await estimateBacklinks(url);
+    const performance = mockPerformanceMetrics();
+
+    const result: AnalysisResult = {
+      totalLinks: internalLinks.length + externalLinks.length,
+      internalLinks,
+      externalLinks,
+      backlinksEstimate: linkedFrom.length,
+      linkedFrom,
+      performance
+    };
+
+    cache.set(url, result);
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to analyze links' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Enhanced Backlink Analyzer running on http://localhost:${PORT}`);
+});

@@ -1,0 +1,64 @@
+update the existing domain authority tool and Build a backend service that calculates Domain Authority (DA) and Page Authority (PA) for a given URL rename the tool as "Website Authority (DA/PA)". The tool should simulate authority scoring using publicly available metrics and client-side scraping techniques. Avoid reliance on paid APIs like Moz, Ahrefs, or SEMrush. The backend should be lightweight, privacy-conscious, and suitable for deployment on platforms like Replit or GitHub Pages (via serverless functions or edge workers).
+
+
+⚙️ Functional Requirements
+1. Input Handling
+- Accept a URL via a POST or GET request.
+- Normalize and validate the input:
+- Ensure proper protocol (https://)
+- Extract domain and path separately
+- Reject malformed or non-resolvable URLs
+2. Data Collection (API-Free)
+Use scraping and public data sources to gather the following metrics:
+- Backlink Count:
+- Use Google search with site:example.com or link:example.com (simulate via scraping SERPs)
+- Optionally scrape backlink counts from public tools like OpenLinkProfiler.org or Whois.domaintools.com
+- Domain Age:
+- Perform WHOIS lookup using public WHOIS APIs or scrape from https://who.is
+- Extract creation date and calculate age in years
+- Page Metadata:
+- Scrape <title>, <meta name="description">, <meta name="keywords">
+- Check for presence and length of metadata
+- Page Load Speed:
+- Use Puppeteer or Playwright to measure window.performance.timing
+- Alternatively, simulate with requests and measure response time
+- HTTPS Status:
+- Check if the URL uses HTTPS
+- Mobile-Friendliness:
+- Use headless browser to simulate viewport and check for responsive design elements (e.g., viewport meta tag)
+
+🧮 Scoring Algorithm
+Create a weighted scoring system to simulate DA and PA:
+| Metric | Weight | Notes | 
+| Backlink Count | 40% | Normalize based on log scale | 
+| Domain Age | 20% | Older domains score higher | 
+| Page Speed | 15% | Faster pages score higher | 
+| HTTPS + Mobile UX | 10% | Bonus for secure and responsive design | 
+| Metadata Completeness | 15% | Title + description + keywords | 
+
+
+- Normalize each metric to a 0–100 scale
+- Combine weighted scores to produce:
+- Domain Authority (DA): Based on domain-wide metrics
+- Page Authority (PA): Based on page-specific metrics
+
+🧾 Output Format
+Return a structured JSON response with all relevant metrics:
+{
+  "domain": "example.com",
+  "url": "https://example.com/blog/post",
+  "domain_authority": 72,
+  "page_authority": 65,
+  "metrics": {
+    "backlinks": 120,
+    "domain_age": "12 years",
+    "page_speed": "1.2s",
+    "https": true,
+    "mobile_friendly": true,
+    "metadata": {
+      "title": "How to Build a Website Authority Tool",
+      "description": "Learn how to calculate domain and page authority using public data.",
+      "keywords": ["SEO", "domain authority", "page authority"]
+    }
+  }
+}

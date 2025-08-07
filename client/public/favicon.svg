@@ -1,0 +1,35 @@
+<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+  <!-- Main bee body (abdomen) -->
+  <ellipse cx="12" cy="16" rx="3.2" ry="4.5" fill="#444444" stroke="#333" stroke-width="0.3"/>
+  
+  <!-- Yellow stripes on abdomen -->
+  <ellipse cx="12" cy="14" rx="2.8" ry="1" fill="#FFD700"/>
+  <ellipse cx="12" cy="16.5" rx="2.8" ry="1" fill="#FFD700"/>
+  
+  <!-- Thorax (middle section) -->
+  <ellipse cx="12" cy="10" rx="2.5" ry="2.5" fill="#444444" stroke="#333" stroke-width="0.3"/>
+  
+  <!-- Head -->
+  <circle cx="12" cy="6.5" r="2" fill="#444444" stroke="#333" stroke-width="0.3"/>
+  
+  <!-- Antennae -->
+  <path d="M10.5 5 Q9 3.5 8.5 2.5" stroke="#333" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+  <path d="M13.5 5 Q15 3.5 15.5 2.5" stroke="#333" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+  <circle cx="8.5" cy="2.5" r="0.4" fill="#333"/>
+  <circle cx="15.5" cy="2.5" r="0.4" fill="#333"/>
+  
+  <!-- Wings - left wing -->
+  <ellipse cx="9" cy="9" rx="3.5" ry="2.2" fill="rgba(255,255,255,0.9)" stroke="#333" stroke-width="0.2" transform="rotate(-15 9 9)"/>
+  <ellipse cx="8.5" cy="11" rx="2.8" ry="1.8" fill="rgba(255,255,255,0.8)" stroke="#333" stroke-width="0.2" transform="rotate(-10 8.5 11)"/>
+  
+  <!-- Wings - right wing -->
+  <ellipse cx="15" cy="9" rx="3.5" ry="2.2" fill="rgba(255,255,255,0.9)" stroke="#333" stroke-width="0.2" transform="rotate(15 15 9)"/>
+  <ellipse cx="15.5" cy="11" rx="2.8" ry="1.8" fill="rgba(255,255,255,0.8)" stroke="#333" stroke-width="0.2" transform="rotate(10 15.5 11)"/>
+  
+  <!-- Wing details (veins) -->
+  <path d="M7 8 Q9 9 9 11" stroke="#333" stroke-width="0.2" fill="none"/>
+  <path d="M17 8 Q15 9 15 11" stroke="#333" stroke-width="0.2" fill="none"/>
+  
+  <!-- Stinger -->
+  <path d="M12 20 L12 21.5" stroke="#333" stroke-width="0.8" stroke-linecap="round"/>
+</svg>

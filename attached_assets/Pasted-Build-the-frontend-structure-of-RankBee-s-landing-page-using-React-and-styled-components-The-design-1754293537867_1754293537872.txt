@@ -1,0 +1,54 @@
+Build the frontend structure of RankBee’s landing page using React and styled-components. The design should reflect a modern, minimalist aesthetic with a pastel monochromatic color palette—preferably soft honey yellow or muted amber tones to align with the “bee” theme.
+
+Structure:
+1. A sticky top navigation bar with the RankBee logo on the left and clean (generate a minimalist and modern site logo.
+), unobtrusive links (e.g., Tools, Features, About, Blogs, Contact) on the right.
+2. A hero section with a bold headline like “Rank Higher with
+RankBee
+Comprehensive SEO toolkit with keyword research, domain analysis, backlink checking, and more. Boost your search rankings with our professional-grade tools.” and a subtle call-to-action button (“Start Analyzing”, "View Tools") centered on a soft gradient background.
+3. A feature grid (3-column layout) showcasing RankBee’s core benefits: Privacy-first processing, 15+ SEO Tools, 100% Free to use, and Gamified trials—each with minimalist icons and short descriptions.
+4. below the feature grid is a section displaying in centre: Why SEO Matters
+"Transform Your Website's Performance with RankBee
+Join millions of website owners who've increased their organic traffic and search rankings using our comprehensive SEO toolkit. No technical expertise required."
+5. below this section include display cards with hover transition showing: +53%
+Increase Organic Traffic
+Drive 53% more traffic with proper SEO optimization, Page 1
+Higher SERP Rankings
+Rank on the first page for your target keywords, 98% Mobile
+Better User Experience
+Improve site speed and mobile responsiveness, 300% ROI
+Measurable ROI
+Track conversions and revenue growth.
+6. below this section include a material ui display card with hover transition along with an illustration related to Advanced SEO Analytics
+"Get real-time insights with our powerful web scraping technology"
+and then RankBee Advantages
+Why Choose RankBee Over Expensive Alternatives?
+Get professional-grade SEO insights without the hefty price tag. Our platform delivers the same data quality as premium tools like Ahrefs and SEMrush.
+
+Real-time web scraping and analysis
+-50+ keyword suggestions per search
+-Comprehensive domain authority metrics
+-Free alternative to expensive SEO tools
+-No API limits or subscription required
+-Advanced filtering and location targeting
+Pro Tip:
+Start with keyword research to identify high-traffic, low-competition opportunities. Then use our domain analysis tools to understand your competition and improve your strategy.
+7. include a tip section within each tool to guide user about the best results watch for this trend. guidance about the tool.
+8. below this section include this display card: Ready to Dominate Search Results?
+Join 50,000+ websites already using RankBee to improve their SEO performance
+
+100% Free Forever
+•
+No Registration Required
+•
+Instant Results
+9. Tools Section
+10. A testimonial section with muted background contrast and user quotes in elegant typography.
+11. A footer with essential links (Privacy Policy, social media links, Contact) and a small note about RankBee’s Professional SEO tools to help you rank higher, analyze better, and grow faster. Everything you need for successful digital marketing.
+
+Design Notes:
+- Use Google Fonts like Inter or Poppins for clean sans-serif typography.
+- Prioritize whitespace, smooth transitions, and subtle hover effects.
+- Ensure full mobile responsiveness and accessibility compliance.
+- remove footer links like api references, documentation instead include quick links of the header and statics pages like disclaimer, privacy policy, terms of service and contact. 
+

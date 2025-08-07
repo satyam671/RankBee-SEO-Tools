@@ -1,0 +1,85 @@
+// dependencies
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import { v4 as uuidv4 } from 'uuid';
+
+puppeteer.use(StealthPlugin());
+
+// 🔐 Proxy configuration
+const PROXIES = [
+  'http://scraperapi.com?api_key=YOUR_SCRAPERAPI_KEY',
+  'http://brd.superproxy.io:22225:username-password', // BrightData format
+  'http://free-proxy1.com',
+  'http://free-proxy2.com'
+];
+
+// 🧠 In-memory cache
+const cache: Record<string, string[]> = {};
+
+// 🔍 Search engine URLs
+const engineUrls: Record<string, (keyword: string) => string> = {
+  google: (q) => `https://www.google.com/search?q=${encodeURIComponent(q)}`,
+  bing: (q) => `https://www.bing.com/search?q=${encodeURIComponent(q)}`,
+  yahoo: (q) => `https://search.yahoo.com/search?p=${encodeURIComponent(q)}`,
+  duckduckgo: (q) => `https://duckduckgo.com/?q=${encodeURIComponent(q)}`
+};
+
+// 🧪 Utility: Random proxy selector
+function getRandomProxy(): string {
+  return PROXIES[Math.floor(Math.random() * PROXIES.length)];
+}
+
+// 🧪 Utility: Unique link filter
+function filterLinks(links: string[]): string[] {
+  return [...new Set(links)].filter(link =>
+    link.startsWith('http') &&
+    !link.includes('google.com') &&
+    !link.includes('bing.com') &&
+    !link.includes('yahoo.com') &&
+    !link.includes('duckduckgo.com')
+  );
+}
+
+// 🧠 Core scraper function
+async function fetchSERPWithPuppeteer(keyword: string, engine: string): Promise<string[]> {
+  const url = engineUrls[engine.toLowerCase()]?.(keyword);
+  if (!url) throw new Error(`Unsupported search engine: ${engine}`);
+
+  const proxy = getRandomProxy();
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: [`--proxy-server=${proxy}`]
+  });
+
+  const page = await browser.newPage();
+  await page.setUserAgent(`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/${uuidv4()} (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36`);
+
+  try {
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+
+    const links = await page.$$eval('a', anchors =>
+      anchors.map(a => a.href)
+    );
+
+    await browser.close();
+    return filterLinks(links).slice(0, 50);
+  } catch (err) {
+    await browser.close();
+    throw new Error(`Scraping failed for ${engine}: ${err.message}`);
+  }
+}
+
+// 🔄 Fallback + caching wrapper
+export async function fetchRankLinks(keyword: string, engine: string): Promise<string[]> {
+  const cacheKey = `${engine}:${keyword}`;
+  if (cache[cacheKey]) return cache[cacheKey];
+
+  try {
+    const results = await fetchSERPWithPuppeteer(keyword, engine);
+    cache[cacheKey] = results;
+    return results;
+  } catch (err) {
+    console.warn(`Fallback triggered for ${engine}:`, err.message);
+    return [];
+  }
+}

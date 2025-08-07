@@ -1,0 +1,93 @@
+// src/rankTracker.ts
+import express from 'express';
+import axios from 'axios';
+import cheerio from 'cheerio';
+import cors from 'cors';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const PORT = 3000;
+
+interface RankResult {
+  keyword: string;
+  domain: string;
+  searchEngine: string;
+  rank: number | null;
+  top3: boolean;
+  top20: boolean;
+  firstPage: boolean;
+  visibility: 'easy' | 'medium' | 'hard';
+  matchedUrl?: string;
+}
+
+const searchEngineUrls: Record<string, (keyword: string) => string> = {
+  google: (kw) => `https://www.google.com/search?q=${encodeURIComponent(kw)}`,
+  bing: (kw) => `https://www.bing.com/search?q=${encodeURIComponent(kw)}`,
+  yahoo: (kw) => `https://search.yahoo.com/search?p=${encodeURIComponent(kw)}`,
+  duckduckgo: (kw) => `https://duckduckgo.com/?q=${encodeURIComponent(kw)}`
+};
+
+async function fetchSERP(keyword: string, engine: string): Promise<string[]> {
+  const urlBuilder = searchEngineUrls[engine.toLowerCase()];
+  if (!urlBuilder) throw new Error('Unsupported search engine');
+
+  const searchUrl = urlBuilder(keyword);
+  const { data: html } = await axios.get(searchUrl, {
+    headers: { 'User-Agent': 'Mozilla/5.0' }
+  });
+
+  const $ = cheerio.load(html);
+  const links: string[] = [];
+
+  $('a').each((_, el) => {
+    const href = $(el).attr('href');
+    if (href && href.startsWith('http') && !href.includes('google.com') && !href.includes('bing.com') && !href.includes('yahoo.com') && !href.includes('duckduckgo.com')) {
+      links.push(href);
+    }
+  });
+
+  return [...new Set(links)].slice(0, 50); // Limit to top 50 results
+}
+
+function analyzeRank(domain: string, links: string[], keyword: string, engine: string): RankResult {
+  const rank = links.findIndex(link => link.includes(domain)) + 1;
+  const matchedUrl = links.find(link => link.includes(domain)) || undefined;
+
+  let visibility: 'easy' | 'medium' | 'hard' = 'hard';
+  if (rank > 0 && rank <= 5) visibility = 'easy';
+  else if (rank > 5 && rank <= 20) visibility = 'medium';
+
+  return {
+    keyword,
+    domain,
+    searchEngine: engine,
+    rank: rank || null,
+    top3: rank > 0 && rank <= 3,
+    top20: rank > 0 && rank <= 20,
+    firstPage: rank > 0 && rank <= 10,
+    visibility,
+    matchedUrl
+  };
+}
+
+app.post('/track-rank', async (req, res) => {
+  const { domain, keyword, searchEngine } = req.body;
+  if (!domain || !keyword || !searchEngine) {
+    return res.status(400).json({ error: 'Missing domain, keyword, or search engine' });
+  }
+
+  try {
+    const links = await fetchSERP(keyword, searchEngine);
+    const result = analyzeRank(domain.replace(/^https?:\/\//, ''), links, keyword, searchEngine);
+    res.json(result);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch SERP or analyze rank' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Rank Tracker running on http://localhost:${PORT}`);
+});

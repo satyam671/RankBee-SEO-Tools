@@ -1,0 +1,142 @@
+// src/rankTracker.ts
+import express from 'express';
+import axios from 'axios';
+import cheerio from 'cheerio';
+import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const PORT = 3000;
+const HISTORY_FILE = path.join(__dirname, 'rank-history.json');
+
+interface RankResult {
+  keyword: string;
+  domain: string;
+  searchEngine: string;
+  rank: number | null;
+  top3: boolean;
+  top20: boolean;
+  firstPage: boolean;
+  visibility: 'easy' | 'medium' | 'hard';
+  matchedUrl?: string;
+  timestamp: string;
+}
+
+const searchEngineUrls: Record<string, (keyword: string) => string> = {
+  google: (kw) => `https://www.google.com/search?q=${encodeURIComponent(kw)}`,
+  bing: (kw) => `https://www.bing.com/search?q=${encodeURIComponent(kw)}`,
+  yahoo: (kw) => `https://search.yahoo.com/search?p=${encodeURIComponent(kw)}`,
+  duckduckgo: (kw) => `https://duckduckgo.com/html/?q=${encodeURIComponent(kw)}`
+};
+
+function normalizeDomain(domain: string): string {
+  try {
+    const url = new URL(domain.startsWith('http') ? domain : `https://${domain}`);
+    return url.hostname.replace(/^www\./, '');
+  } catch {
+    return domain.replace(/^https?:\/\//, '').replace(/^www\./, '');
+  }
+}
+
+async function fetchSERP(keyword: string, engine: string): Promise<string[]> {
+  const urlBuilder = searchEngineUrls[engine.toLowerCase()];
+  if (!urlBuilder) throw new Error(`Unsupported search engine: ${engine}`);
+
+  const searchUrl = urlBuilder(keyword);
+  const { data: html } = await axios.get(searchUrl, {
+    headers: { 'User-Agent': 'Mozilla/5.0' }
+  });
+
+  const $ = cheerio.load(html);
+  const links: string[] = [];
+
+  $('a').each((_, el) => {
+    const href = $(el).attr('href');
+    if (href && href.startsWith('http') && !href.includes('google.com') && !href.includes('bing.com') && !href.includes('yahoo.com') && !href.includes('duckduckgo.com')) {
+      links.push(href.split('&')[0]);
+    }
+  });
+
+  return [...new Set(links)].slice(0, 50);
+}
+
+function analyzeRank(domain: string, links: string[], keyword: string, engine: string): RankResult {
+  const normalizedDomain = normalizeDomain(domain);
+  const matchedIndex = links.findIndex(link => normalizeDomain(link).includes(normalizedDomain));
+  const matchedUrl = links.find(link => normalizeDomain(link).includes(normalizedDomain));
+  const rank = matchedIndex >= 0 ? matchedIndex + 1 : null;
+
+  let visibility: 'easy' | 'medium' | 'hard' = 'hard';
+  if (rank && rank <= 5) visibility = 'easy';
+  else if (rank && rank <= 20) visibility = 'medium';
+
+  return {
+    keyword,
+    domain: normalizedDomain,
+    searchEngine: engine,
+    rank,
+    top3: rank !== null && rank <= 3,
+    top20: rank !== null && rank <= 20,
+    firstPage: rank !== null && rank <= 10,
+    visibility,
+    matchedUrl,
+    timestamp: new Date().toISOString()
+  };
+}
+
+function saveToHistory(results: RankResult[]) {
+  let history: RankResult[] = [];
+  try {
+    if (fs.existsSync(HISTORY_FILE)) {
+      const raw = fs.readFileSync(HISTORY_FILE, 'utf-8');
+      history = JSON.parse(raw);
+    }
+  } catch (err) {
+    console.error('Failed to read history file:', err.message);
+  }
+
+  history.push(...results);
+  fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2));
+}
+
+app.post('/track-rank', async (req, res) => {
+  const { domain, keywords, searchEngine } = req.body;
+
+  if (!domain || !Array.isArray(keywords) || !searchEngine) {
+    return res.status(400).json({ error: 'Missing domain, keywords array, or search engine' });
+  }
+
+  try {
+    const results: RankResult[] = [];
+
+    for (const keyword of keywords) {
+      const links = await fetchSERP(keyword, searchEngine);
+      const result = analyzeRank(domain, links, keyword, searchEngine);
+      results.push(result);
+    }
+
+    saveToHistory(results);
+    res.json({ results });
+  } catch (error) {
+    console.error('Batch rank tracking error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch SERPs or analyze ranks' });
+  }
+});
+
+app.get('/rank-history', (req, res) => {
+  try {
+    const raw = fs.readFileSync(HISTORY_FILE, 'utf-8');
+    const history: RankResult[] = JSON.parse(raw);
+    res.json({ history });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load rank history' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`🚀 Rank Tracker API running at http://localhost:${PORT}`);
+});

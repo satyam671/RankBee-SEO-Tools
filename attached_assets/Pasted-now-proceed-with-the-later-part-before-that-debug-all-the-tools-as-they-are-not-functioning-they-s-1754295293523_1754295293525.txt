@@ -1,0 +1,28 @@
+now proceed with the later part: before that debug all the tools as they are not functioning, they should fetch real time results by scraping the web in real time. 
+1. Add advanced SEO tools (Backlink Analyzer, Sitemap Generator, Rank Tracker)
+2. Implement Redis caching and task queue system
+3. Add specialized keyword tools (Amazon, YouTube, Google, Bing)
+4. Integrate comprehensive analytics and reporting features
+5. Add the remaining SEO tools as described in the first prompt.
+6. Add SEO scoring logic: Analyze content for keyword density, meta optimization, and readability.
+7. Output should include suggestions to improve search rankings (e.g., “Consider using long-tail keywords”).
+Example output: "Score: 72/100. Improve by adding H2 headings and 2 internal links."
+
+8. Add a Site Explorer Dashboard:
+-Users can enter multiple URLs for bulk comparison.
+-Display metrics like organic traffic, backlinks, organic keywords, referring domains, etc. Use them to compare the performance of Competitor's website.
+-Add health score of URLs Based on redirects, blocks, broken links, crawl success, etc.
+
+9. Integrate Google Search Console free API and google analytics suite free APIs i.e. Free Tier: Google Analytics 4 (GA4) to pull real user data. Add interactive charts (traffic trends, keyword rankings).
+-Also include the % of anonymized queries filtered by Google for privacy.
+-Add interactive charts showing: Keyword trends, traffic stats, health over time, Color gradients for rising/falling trends, Real-time performance monitoring of URLs
+
+10. Content & SEO Optimization
+- Make every tool’s page SEO-optimized with specific meta tags, titles, and headers.
+- Inject relevant keywords into the page content and backend HTML for better discoverability on Google.
+- introduce a new blogs section just below the tools, Write 5 detailed blogs and display a display card on homepage below the tools (start with “Complete Guide to Keyword Research”). redirect the blog button to a new page containing these blogs, write it from the perspective of better SEO, linking the tools using backlinks and utilize keywords all over the blog.
+
+11. Write static pages: About, Privacy Policy, Disclaimer, Terms of Service, Contact: introduce a contact form linking with a free form service like typeform.
+
+12. increase support of all the countries and languages too within each tool and make every static page responsive and redirect the user to its proper place, make all header and footer buttons and links responsive.
+

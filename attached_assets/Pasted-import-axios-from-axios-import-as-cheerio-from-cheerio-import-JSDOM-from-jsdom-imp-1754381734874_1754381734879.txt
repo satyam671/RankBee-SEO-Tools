@@ -1,0 +1,432 @@
+import axios from 'axios';
+import * as cheerio from 'cheerio';
+import { JSDOM } from 'jsdom';
+import puppeteer from 'puppeteer';
+
+interface SearchQueryData {
+  keyword: string;
+  rank: number;
+  cpc: number;
+  difficulty: number;
+  monthlyVolume: number;
+  clicks: number;
+  url: string;
+}
+
+export class TopSearchQueries {
+  private static instance: TopSearchQueries;
+
+  private constructor() {}
+
+  static getInstance(): TopSearchQueries {
+    if (!TopSearchQueries.instance) {
+      TopSearchQueries.instance = new TopSearchQueries();
+    }
+    return TopSearchQueries.instance;
+  }
+
+  private getRandomUserAgent(): string {
+    const userAgents = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    ];
+    return userAgents[Math.floor(Math.random() * userAgents.length)];
+  }
+
+  private normalizeDomain(url: string): string {
+    try {
+      const cleanUrl = url.replace(/^https?:\/\//, '').replace(/\/$/, '').toLowerCase();
+      return cleanUrl.replace(/^www\./, '');
+    } catch {
+      return url.toLowerCase();
+    }
+  }
+
+  async getTopQueries(url: string, country: string = 'us'): Promise<SearchQueryData[]> {
+    const domain = this.normalizeDomain(url);
+    console.log(`Fetching top search queries for: ${domain} in country: ${country}`);
+
+    try {
+      // Method 1: Try scraping from Google Search Console data (if available)
+      try {
+        const googleResults = await this.scrapeGoogleSearchConsole(domain, country);
+        if (googleResults.length > 0) {
+          return googleResults;
+        }
+      } catch (googleError) {
+        console.log('Google Search Console scraping failed, trying alternative methods...');
+      }
+
+      // Method 2: Scrape from SEMrush (if available)
+      try {
+        const semrushResults = await this.scrapeSEMrush(domain, country);
+        if (semrushResults.length > 0) {
+          return semrushResults;
+        }
+      } catch (semrushError) {
+        console.log('SEMrush scraping failed, trying alternative methods...');
+      }
+
+      // Method 3: Fallback to Google search suggestions and related queries
+      const fallbackResults = await this.scrapeFromGoogleSuggestions(domain, country);
+      return fallbackResults;
+    } catch (error) {
+      console.error('Error getting top search queries:', error);
+      throw new Error('Failed to retrieve top search queries');
+    }
+  }
+
+  private async scrapeGoogleSearchConsole(domain: string, country: string): Promise<SearchQueryData[]> {
+    // This is a placeholder - in a real implementation you would need authenticated access
+    // to Google Search Console API or would scrape from a logged-in session
+    console.log(`Attempting to scrape Google Search Console data for ${domain}`);
+    
+    // For demo purposes, we'll simulate this with a headless browser approach
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    try {
+      const page = await browser.newPage();
+      await page.setUserAgent(this.getRandomUserAgent());
+      
+      // Note: This would need actual GSC credentials to work
+      await page.goto('https://search.google.com/search-console', { waitUntil: 'networkidle2' });
+      
+      // Here you would need to implement the actual login and navigation
+      // This is just a conceptual example
+      await page.type('input[type="email"]', 'your-email@example.com');
+      await page.click('#identifierNext');
+      await page.waitForNavigation();
+      
+      await page.type('input[type="password"]', 'yourpassword');
+      await page.click('#passwordNext');
+      await page.waitForNavigation();
+      
+      await page.goto(`https://search.google.com/search-console/performance/search-analytics?resource_id=${encodeURIComponent(domain)}`, { waitUntil: 'networkidle2' });
+      
+      // Extract data from the performance table
+      const results = await page.evaluate(() => {
+        const queries: SearchQueryData[] = [];
+        const rows = document.querySelectorAll('.performance-row');
+        
+        rows.forEach((row, index) => {
+          const keyword = row.querySelector('.query-text')?.textContent?.trim() || '';
+          const clicks = parseInt(row.querySelector('.clicks-cell')?.textContent?.trim() || '0');
+          const impressions = parseInt(row.querySelector('.impressions-cell')?.textContent?.trim() || '0');
+          const ctr = parseFloat(row.querySelector('.ctr-cell')?.textContent?.trim() || '0');
+          
+          queries.push({
+            keyword,
+            rank: index + 1,
+            cpc: 0, // GSC doesn't provide CPC
+            difficulty: Math.round((1 - ctr) * 100), // Estimate difficulty
+            monthlyVolume: impressions / 30, // Estimate monthly volume
+            clicks,
+            url: '' // GSC doesn't provide URLs for queries
+          });
+        });
+        
+        return queries;
+      });
+      
+      return results.slice(0, 50); // Return top 50 results
+    } finally {
+      await browser.close();
+    }
+  }
+
+  private async scrapeSEMrush(domain: string, country: string): Promise<SearchQueryData[]> {
+    console.log(`Attempting to scrape SEMrush data for ${domain}`);
+    
+    try {
+      const response = await axios.get(`https://www.semrush.com/analytics/organic/overview/?q=${domain}&db=${country}`, {
+        headers: {
+          'User-Agent': this.getRandomUserAgent(),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        }
+      });
+      
+      const $ = cheerio.load(response.data);
+      const results: SearchQueryData[] = [];
+      
+      // Parse SEMrush organic keywords table
+      $('.organic-keywords-table tbody tr').each((index, row) => {
+        const keyword = $(row).find('.keyword-cell').text().trim();
+        const volumeText = $(row).find('.volume-cell').text().trim();
+        const cpcText = $(row).find('.cpc-cell').text().trim();
+        const difficultyText = $(row).find('.difficulty-cell').text().trim();
+        const url = $(row).find('.url-cell').text().trim();
+        
+        const volume = parseInt(volumeText.replace(/,/g, '')) || 0;
+        const cpc = parseFloat(cpcText.replace(/[^\d.]/g, '')) || 0;
+        const difficulty = parseInt(difficultyText.replace(/%/g, '')) || 0;
+        
+        if (keyword) {
+          results.push({
+            keyword,
+            rank: index + 1,
+            cpc,
+            difficulty,
+            monthlyVolume: volume,
+            clicks: Math.round(volume * 0.3), // Estimate clicks
+            url
+          });
+        }
+      });
+      
+      return results.slice(0, 50); // Return top 50 results
+    } catch (error) {
+      console.error('SEMrush scraping error:', error);
+      return [];
+    }
+  }
+
+  private async scrapeFromGoogleSuggestions(domain: string, country: string): Promise<SearchQueryData[]> {
+    console.log(`Fetching Google suggestions for ${domain}`);
+    
+    try {
+      // First get the main keywords from the website
+      const mainKeywords = await this.extractMainKeywords(domain);
+      const results: SearchQueryData[] = [];
+      
+      // Get suggestions for each main keyword
+      for (const keyword of mainKeywords.slice(0, 5)) {
+        try {
+          const suggestions = await this.getGoogleSuggestions(keyword, country);
+          const related = await this.getGoogleRelated(keyword, country);
+          
+          const allKeywords = [...new Set([...suggestions, ...related])];
+          
+          // Get ranking data for each keyword
+          for (const kw of allKeywords) {
+            try {
+              const rankData = await this.getKeywordRankingData(kw, domain, country);
+              if (rankData) {
+                results.push(rankData);
+              }
+            } catch (rankError) {
+              console.log(`Error getting ranking data for ${kw}:`, rankError);
+            }
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Delay to avoid rate limiting
+          }
+        } catch (suggestionError) {
+          console.log(`Error getting suggestions for ${keyword}:`, suggestionError);
+        }
+      }
+      
+      return results.sort((a, b) => a.rank - b.rank).slice(0, 50);
+    } catch (error) {
+      console.error('Google suggestions scraping error:', error);
+      return [];
+    }
+  }
+
+  private async extractMainKeywords(domain: string): Promise<string[]> {
+    try {
+      const response = await axios.get(`https://${domain}`, {
+        headers: { 'User-Agent': this.getRandomUserAgent() }
+      });
+      
+      const $ = cheerio.load(response.data);
+      const keywords = new Set<string>();
+      
+      // Extract from title
+      const title = $('title').text();
+      if (title) {
+        title.split(/[^\w]+/).forEach(word => {
+          if (word.length > 3) keywords.add(word.toLowerCase());
+        });
+      }
+      
+      // Extract from h1-h3 tags
+      $('h1, h2, h3').each((_, el) => {
+        const text = $(el).text();
+        text.split(/[^\w]+/).forEach(word => {
+          if (word.length > 3) keywords.add(word.toLowerCase());
+        });
+      });
+      
+      // Extract from meta keywords
+      const metaKeywords = $('meta[name="keywords"]').attr('content');
+      if (metaKeywords) {
+        metaKeywords.split(',').forEach(kw => {
+          const trimmed = kw.trim().toLowerCase();
+          if (trimmed) keywords.add(trimmed);
+        });
+      }
+      
+      return Array.from(keywords);
+    } catch (error) {
+      console.error('Error extracting main keywords:', error);
+      return [];
+    }
+  }
+
+  private async getGoogleSuggestions(keyword: string, country: string): Promise<string[]> {
+    try {
+      const response = await axios.get(
+        `https://suggestqueries.google.com/complete/search?client=firefox&q=${encodeURIComponent(keyword)}&gl=${country}`,
+        { headers: { 'User-Agent': this.getRandomUserAgent() } }
+      );
+      
+      if (Array.isArray(response.data) && response.data.length > 1) {
+        return response.data[1].map((s: string) => s.toLowerCase());
+      }
+      return [];
+    } catch (error) {
+      console.error('Error getting Google suggestions:', error);
+      return [];
+    }
+  }
+
+  private async getGoogleRelated(keyword: string, country: string): Promise<string[]> {
+    try {
+      const response = await axios.get(
+        `https://www.google.com/search?q=${encodeURIComponent(keyword)}&gl=${country}`,
+        { 
+          headers: { 
+            'User-Agent': this.getRandomUserAgent(),
+            'Accept-Language': 'en-US,en;q=0.5'
+          } 
+        }
+      );
+      
+      const $ = cheerio.load(response.data);
+      const related: string[] = [];
+      
+      // Get "Searches related to" suggestions
+      $('div.related-question-pair').each((_, el) => {
+        const text = $(el).text().trim();
+        if (text) related.push(text.toLowerCase());
+      });
+      
+      return related;
+    } catch (error) {
+      console.error('Error getting Google related searches:', error);
+      return [];
+    }
+  }
+
+  private async getKeywordRankingData(keyword: string, domain: string, country: string): Promise<SearchQueryData | null> {
+    try {
+      const browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      });
+      
+      try {
+        const page = await browser.newPage();
+        await page.setUserAgent(this.getRandomUserAgent());
+        await page.setExtraHTTPHeaders({
+          'Accept-Language': 'en-US,en;q=0.9'
+        });
+        
+        const googleDomain = this.getGoogleDomain(country);
+        const searchUrl = `https://${googleDomain}/search?q=${encodeURIComponent(keyword)}&gl=${country}&num=50`;
+        
+        await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+        
+        // Check if our domain appears in the results
+        const rank = await page.evaluate((targetDomain) => {
+          const results = document.querySelectorAll('div.g');
+          for (let i = 0; i < results.length; i++) {
+            const links = results[i].querySelectorAll('a[href]');
+            for (const link of links) {
+              const href = link.getAttribute('href');
+              if (href && (href.includes(targetDomain) || href.includes(targetDomain.replace('www.', '')))) {
+                return i + 1; // Return 1-based rank
+              }
+            }
+          }
+          return -1; // Not found in top 50
+        }, domain);
+        
+        if (rank === -1) return null;
+        
+        // Get CPC and volume estimates
+        const kwData = await this.estimateKeywordMetrics(keyword, country);
+        
+        return {
+          keyword,
+          rank,
+          cpc: kwData.cpc,
+          difficulty: kwData.difficulty,
+          monthlyVolume: kwData.volume,
+          clicks: Math.round(kwData.volume * 0.3), // Estimate clicks
+          url: '' // Would need more complex scraping to get specific URL
+        };
+      } finally {
+        await browser.close();
+      }
+    } catch (error) {
+      console.error('Error getting keyword ranking data:', error);
+      return null;
+    }
+  }
+
+  private async estimateKeywordMetrics(keyword: string, country: string): Promise<{ cpc: number; difficulty: number; volume: number }> {
+    // This is a simplified estimation - in a real implementation you would
+    // scrape this data from keyword research tools or APIs
+    
+    // Estimate based on keyword characteristics
+    const wordCount = keyword.split(' ').length;
+    const isCommercial = ['buy', 'price', 'cheap', 'discount', 'review'].some(w => keyword.includes(w));
+    
+    // Base values
+    let cpc = isCommercial ? 1.5 : 0.5;
+    let difficulty = 40;
+    let volume = 1000;
+    
+    // Adjust based on word count
+    if (wordCount === 1) {
+      cpc *= 2;
+      difficulty += 20;
+      volume *= 5;
+    } else if (wordCount === 2) {
+      cpc *= 1.5;
+      difficulty += 10;
+      volume *= 3;
+    } else {
+      cpc *= 0.7;
+      difficulty -= 5;
+      volume *= 1.5;
+    }
+    
+    // Adjust for country
+    const countryMultipliers: Record<string, number> = {
+      'us': 1.0,
+      'uk': 0.8,
+      'ca': 0.7,
+      'au': 0.6,
+      'in': 0.5
+    };
+    const multiplier = countryMultipliers[country.toLowerCase()] || 0.5;
+    volume = Math.round(volume * multiplier);
+    
+    return {
+      cpc: parseFloat(cpc.toFixed(2)),
+      difficulty: Math.min(Math.max(difficulty, 10), 90),
+      volume: Math.max(volume, 10)
+    };
+  }
+
+  private getGoogleDomain(country: string): string {
+    const domains: Record<string, string> = {
+      'us': 'google.com',
+      'uk': 'google.co.uk',
+      'ca': 'google.ca',
+      'au': 'google.com.au',
+      'de': 'google.de',
+      'fr': 'google.fr',
+      'es': 'google.es',
+      'it': 'google.it',
+      'br': 'google.com.br',
+      'in': 'google.co.in',
+      'jp': 'google.co.jp'
+    };
+    return domains[country.toLowerCase()] || 'google.com';
+  }
+}

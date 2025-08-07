@@ -1,0 +1,91 @@
+Create a comprehensive full-stack SEO tools web application called "RankBee" with the following specifications:
+
+## 🧩 Project Overview
+Build a complete SEO toolkit web application featuring multiple tools for keyword research, site analysis, and SEO optimization. The app must be fully functional without relying on paid APIs, using real-time web scraping and crawling techniques instead. Prioritize privacy-first design and lean infrastructure.
+
+## 🛠️ Core Features to Implement
+Implement the following tools with real-time functionality:
+1. Keyword Research Tool — Generate keyword suggestions and search volume estimates
+2. Keyword Density Analyzer — Calculate keyword frequency and density percentages
+3. Domain/Page Authority Checker — Estimate domain and page authority scores
+4. Backlink Analyzer — Discover and analyze backlinks for any domain
+5. Sitemap Generator/Analyzer — Create and validate XML sitemaps
+6. Top Search Queries Tool — Identify trending search terms
+7. Link Analysis Tool — Analyze internal and external links
+8. Top Referrers Tracker — Identify traffic sources and referral domains
+9. Meta Tags Extractor — Extract and analyze meta titles, descriptions, and tags
+10. Traffic Checker
+11. Amazon Keyword Tool
+12. YouTube Keyword Tool
+13. Google Keyword Tool
+14. Bing Keyword Tool
+15. Rank Tracker
+
+## ⚙️ Backend Requirements
+Use Node.js with Express.js to build RESTful APIs. Backend must include:
+
+- **User Authentication**: JWT-based signup/login system
+- **Scraping & Crawling**:
+  - Use Cheerio + Axios or Puppeteer/Playwright for real-time scraping
+  - Create endpoints like `/scrape-keywords`, `/crawl-site`, `/extract-meta`, etc.
+  - Crawl internal links up to 2 levels deep and extract metadata
+- **Serverless Functions**:
+  - Use Supabase Edge Functions or equivalent to offload scraping/crawling logic
+- **Task Queue**:
+  - Use Celery + Redis for long-running jobs like backlink analysis or sitemap generation
+- **Caching**:
+  - Use Redis to cache frequent lookups (e.g., domain scores, keyword suggestions)
+- **Scheduling**:
+  - Use node-cron to periodically refresh cached data
+- **Monitoring**:
+  - Add logging middleware or Logtail integration for activity/error tracking
+- **Testing**:
+  - Use Jest for backend unit tests
+
+## 🧮 Data Handling
+- Scrape public sources and estimate SEO metrics using open algorithms
+- Sanitize and validate all inputs
+- Ensure cross-browser compatibility
+- Return JSON responses with proper CORS headers
+
+## 🖼️ Frontend Requirements
+Use React.js with Vite for fast builds. Include:
+
+- **UI Library**: Material UI (MUI) for Google Material Design
+- **State Management**: React Context API or Zustand
+- **Animations**: Framer Motion for transitions and micro-interactions
+- **Responsiveness**: Mobile-first design
+- **Icons & Illustrations**:
+  - Use category-specific icons
+  - Integrate undraw.co illustrations
+- **Branding**:
+  - App name: "RankBee"
+  - Tagline: Engaging and SEO-centric below the logo
+
+## 📐 UI/UX Design Specifications
+Follow Google Material Design principles:
+- Paper-like cards with elevation shadows
+- Bold color palette and consistent typography
+- Flat buttons with ripple animations
+- Grid-based layout with consistent spacing
+
+## 📄 Content Structure
+- **Header**: Logo, navigation, tagline
+- **Tool Grid**: Visual cards for each SEO tool
+- **Footer**: Quick Links — About Us, Disclaimer, Privacy Policy, Terms of Service, Contact
+
+## ✅ Functional Requirements
+- All tools must work in real-time without external API dependencies
+- Implement proper error handling and loading states
+- Include result caching and input sanitization
+- Ensure clean, well-documented code
+- Deliver a modern, intuitive UI that provides genuine value to SEO professionals
+
+## 🔍 Reference
+Use wittyrank.com for inspiration, but create an original design and architecture.
+
+## 🧠 Additional Notes for Replit AI
+- Use comments to explain backend logic
+- Modularize code for scalability
+- Prioritize performance and privacy
+- Scaffold the project with GitHub integration and version control best practices

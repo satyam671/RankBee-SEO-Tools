@@ -1,0 +1,61 @@
+ Starting competition analysis for: https://pdfescape.com with 1 keywords
+Analyzing keyword: "pdf to word converter"
+Finding competitors for keyword: "pdf to word converter" using multi-source approach
+Fetching from DuckDuckGo for "pdf to word converter"
+Enhanced DuckDuckGo provided 10 competitors
+Fetching from Bing for "pdf to word converter"
+Enhanced Bing provided 10 additional competitors
+Fetching Google suggestions for "pdf to word converter"
+Google Suggest provided 10 related queries for "pdf to word converter"
+Enhanced DuckDuckGo provided 10 competitors
+Enhanced DuckDuckGo provided 2 competitors
+Enhanced DuckDuckGo provided 10 competitors
+Enhanced DuckDuckGo provided 0 competitors
+Multi-source approach found 16 unique competitors
+Found 16 competitors using multi-source approach
+Found new competitor: ilovepdf.com
+Analyzing competitor website: ilovepdf.com
+Analyzed ilovepdf.com: DA=64, PA=62, Backlinks=222
+Found new competitor: alternativeto.net
+Analyzing competitor website: alternativeto.net
+Error analyzing competitor website alternativeto.net: AxiosError: Request failed with status code 403
+    at settle (file:///home/runner/workspace/node_modules/axios/lib/core/settle.js:19:12)
+    at BrotliDecompress.handleStreamEnd (file:///home/runner/workspace/node_modules/axios/lib/adapters/http.js:599:11)
+    at BrotliDecompress.emit (node:events:536:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:82:21)
+    at Axios.request (file:///home/runner/workspace/node_modules/axios/lib/core/Axios.js:45:41)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async CompetitionChecker.analyzeCompetitorWebsite (/home/runner/workspace/server/services/competition-checker.ts:691:24)
+    at async CompetitionChecker.analyzeCompetition (/home/runner/workspace/server/services/competition-checker.ts:128:36)
+    at async <anonymous> (/home/runner/workspace/server/routes.ts:468:24) {
+  code: 'ERR_BAD_REQUEST',
+  config: {
+    transitional: {
+      silentJSONParsing: true,
+      forcedJSONParsing: true,
+      clarifyTimeoutError: false
+    },
+    adapter: [ 'xhr', 'http', 'fetch' ],
+    transformRequest: [ [Function: transformRequest] ],
+    transformResponse: [ [Function: transformResponse] ],
+    timeout: 10000,
+    xsrfCookieName: 'XSRF-TOKEN',
+    xsrfHeaderName: 'X-XSRF-TOKEN',
+    maxContentLength: -1,
+    maxBodyLength: -1,
+    env: { FormData: [Function [FormData]], Blob: [class Blob] },
+    validateStatus: [Function: validateStatus],
+    headers: Object [AxiosHeaders] {
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Content-Type': undefined,
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      'Accept-Language': 'en-US,en;q=0.5',
+      'Accept-Encoding': 'gzip, compress, deflate, br'
+    },
+    maxRedirects: 5,
+    method: 'get',
+    url: 'https://alternativeto.net/software/pdf-to-word-converter/',
+    allowAbsoluteUrls: true,
+    data: undefined
+  },

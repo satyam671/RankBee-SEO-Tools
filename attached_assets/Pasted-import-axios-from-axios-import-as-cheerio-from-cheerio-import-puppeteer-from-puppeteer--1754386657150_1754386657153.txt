@@ -1,0 +1,614 @@
+import axios from 'axios';
+import * as cheerio from 'cheerio';
+import puppeteer from 'puppeteer';
+import { URL } from 'url';
+
+interface KeywordData {
+  keyword: string;
+  volume: number;
+  competition: number;
+  cpc: number;
+  trend: number;
+  firstPositionUrl?: string;
+  firstPositionTitle?: string;
+}
+
+export class KeywordResearch {
+  private static instance: KeywordResearch;
+  private userAgents: string[];
+  private proxyPool: string[];
+
+  private constructor() {
+    this.userAgents = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    ];
+    this.proxyPool = this.getProxyPool();
+  }
+
+  static getInstance(): KeywordResearch {
+    if (!KeywordResearch.instance) {
+      KeywordResearch.instance = new KeywordResearch();
+    }
+    return KeywordResearch.instance;
+  }
+
+  private getProxyPool(): string[] {
+    // Replace with actual proxy IPs in production
+    return [
+      'http://proxy1.example.com:8080',
+      'http://proxy2.example.com:8080',
+      'http://proxy3.example.com:8080'
+    ];
+  }
+
+  private getRandomUserAgent(): string {
+    return this.userAgents[Math.floor(Math.random() * this.userAgents.length)];
+  }
+
+  private getRandomProxy(): string | null {
+    if (this.proxyPool.length === 0) return null;
+    return this.proxyPool[Math.floor(Math.random() * this.proxyPool.length)];
+  }
+
+  async getAmazonKeywords(keyword: string, country: string = 'us'): Promise<KeywordData[]> {
+    console.log(`Researching Amazon keywords for: "${keyword}" in ${country}`);
+    
+    try {
+      // Method 1: Scrape Amazon autocomplete
+      const autocompleteResults = await this.scrapeAmazonAutocomplete(keyword, country);
+      
+      // Method 2: Scrape Amazon search results
+      const searchResults = await this.scrapeAmazonSearch(keyword, country);
+      
+      // Method 3: Get related keywords from Amazon product pages
+      const relatedResults = await this.scrapeAmazonRelated(keyword, country);
+      
+      // Combine and deduplicate results
+      const allKeywords = [...autocompleteResults, ...searchResults, ...relatedResults];
+      const uniqueKeywords = this.deduplicateKeywords(allKeywords);
+      
+      // Get metrics for each keyword
+      const analyzedKeywords = await this.analyzeAmazonKeywords(uniqueKeywords, country);
+      
+      return analyzedKeywords.sort((a, b) => b.volume - a.volume);
+    } catch (error) {
+      console.error('Error in Amazon keyword research:', error);
+      throw new Error('Failed to retrieve Amazon keywords');
+    }
+  }
+
+  async getYouTubeKeywords(keyword: string, country: string = 'us'): Promise<KeywordData[]> {
+    console.log(`Researching YouTube keywords for: "${keyword}" in ${country}`);
+    
+    try {
+      // Method 1: Scrape YouTube autocomplete
+      const autocompleteResults = await this.scrapeYouTubeAutocomplete(keyword, country);
+      
+      // Method 2: Scrape YouTube search results
+      const searchResults = await this.scrapeYouTubeSearch(keyword, country);
+      
+      // Method 3: Get related keywords from YouTube videos
+      const relatedResults = await this.scrapeYouTubeRelated(keyword, country);
+      
+      // Combine and deduplicate results
+      const allKeywords = [...autocompleteResults, ...searchResults, ...relatedResults];
+      const uniqueKeywords = this.deduplicateKeywords(allKeywords);
+      
+      // Get metrics for each keyword
+      const analyzedKeywords = await this.analyzeYouTubeKeywords(uniqueKeywords, country);
+      
+      return analyzedKeywords.sort((a, b) => b.volume - a.volume);
+    } catch (error) {
+      console.error('Error in YouTube keyword research:', error);
+      throw new Error('Failed to retrieve YouTube keywords');
+    }
+  }
+
+  private async scrapeAmazonAutocomplete(keyword: string, country: string): Promise<KeywordData[]> {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    try {
+      const page = await browser.newPage();
+      await page.setUserAgent(this.getRandomUserAgent());
+      
+      const amazonDomain = this.getAmazonDomain(country);
+      await page.goto(`https://${amazonDomain}/s?k=${encodeURIComponent(keyword)}`, {
+        waitUntil: 'networkidle2',
+        timeout: 30000
+      });
+      
+      // Trigger autocomplete dropdown
+      await page.type('#twotabsearchtextbox', ' ');
+      await page.waitForTimeout(1000);
+      
+      const suggestions = await page.evaluate(() => {
+        const items = [];
+        const elements = document.querySelectorAll('.s-suggestion');
+        for (const el of elements) {
+          items.push(el.textContent.trim());
+        }
+        return items;
+      });
+      
+      return suggestions.map(suggestion => ({
+        keyword: suggestion,
+        volume: 0, // Will be updated later
+        competition: 0,
+        cpc: 0,
+        trend: 0
+      }));
+    } finally {
+      await browser.close();
+    }
+  }
+
+  private async scrapeAmazonSearch(keyword: string, country: string): Promise<KeywordData[]> {
+    try {
+      const amazonDomain = this.getAmazonDomain(country);
+      const response = await axios.get(`https://${amazonDomain}/s?k=${encodeURIComponent(keyword)}`, {
+        headers: { 'User-Agent': this.getRandomUserAgent() },
+        timeout: 15000
+      });
+      
+      const $ = cheerio.load(response.data);
+      const keywords: KeywordData[] = [];
+      
+      // Extract keywords from search results
+      $('.s-result-item').each((_, product) => {
+        const title = $(product).find('h2 a span').text().trim();
+        if (title) {
+          // Extract potential keywords from product title
+          const words = title.split(/[\s\-]+/).filter(w => w.length > 3);
+          words.forEach(word => {
+            keywords.push({
+              keyword: word.toLowerCase(),
+              volume: 0,
+              competition: 0,
+              cpc: 0,
+              trend: 0
+            });
+          });
+        }
+      });
+      
+      return keywords;
+    } catch (error) {
+      console.error('Amazon search scraping error:', error);
+      return [];
+    }
+  }
+
+  private async scrapeAmazonRelated(keyword: string, country: string): Promise<KeywordData[]> {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    try {
+      const page = await browser.newPage();
+      await page.setUserAgent(this.getRandomUserAgent());
+      
+      const amazonDomain = this.getAmazonDomain(country);
+      await page.goto(`https://${amazonDomain}/s?k=${encodeURIComponent(keyword)}`, {
+        waitUntil: 'networkidle2',
+        timeout: 30000
+      });
+      
+      // Click on first product to get related keywords
+      await page.click('.s-result-item h2 a');
+      await page.waitForNavigation();
+      
+      const relatedKeywords = await page.evaluate(() => {
+        const keywords = new Set<string>();
+        
+        // Get from "Customers also searched for"
+        const alsoSearched = document.querySelectorAll('.a-carousel-card .a-size-base');
+        alsoSearched.forEach(el => {
+          keywords.add(el.textContent.trim().toLowerCase());
+        });
+        
+        // Get from "Sponsored products related to this item"
+        const sponsored = document.querySelectorAll('.sponsored-products-title');
+        sponsored.forEach(el => {
+          const text = el.textContent.trim().toLowerCase();
+          text.split(/[\s\-]+/).forEach(word => {
+            if (word.length > 3) keywords.add(word);
+          });
+        });
+        
+        // Get from product description
+        const description = document.querySelector('#productDescription')?.textContent;
+        if (description) {
+          description.split(/[\s\-]+/).forEach(word => {
+            if (word.length > 3) keywords.add(word.toLowerCase());
+          });
+        }
+        
+        return Array.from(keywords);
+      });
+      
+      return relatedKeywords.map(keyword => ({
+        keyword,
+        volume: 0,
+        competition: 0,
+        cpc: 0,
+        trend: 0
+      }));
+    } finally {
+      await browser.close();
+    }
+  }
+
+  private async scrapeYouTubeAutocomplete(keyword: string, country: string): Promise<KeywordData[]> {
+    try {
+      const response = await axios.get(
+        `https://suggestqueries.google.com/complete/search?client=youtube&ds=yt&q=${encodeURIComponent(keyword)}&hl=${country}`,
+        { headers: { 'User-Agent': this.getRandomUserAgent() } }
+      );
+      
+      if (Array.isArray(response.data) && response.data.length > 1) {
+        return response.data[1].map((suggestion: string) => ({
+          keyword: suggestion.toLowerCase(),
+          volume: 0,
+          competition: 0,
+          cpc: 0,
+          trend: 0
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error('YouTube autocomplete error:', error);
+      return [];
+    }
+  }
+
+  private async scrapeYouTubeSearch(keyword: string, country: string): Promise<KeywordData[]> {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    try {
+      const page = await browser.newPage();
+      await page.setUserAgent(this.getRandomUserAgent());
+      await page.setExtraHTTPHeaders({
+        'Accept-Language': `en-${country},en;q=0.9`
+      });
+      
+      await page.goto(`https://www.youtube.com/results?search_query=${encodeURIComponent(keyword)}`, {
+        waitUntil: 'networkidle2',
+        timeout: 30000
+      });
+      
+      // Scroll to load more results
+      await page.evaluate(() => {
+        window.scrollBy(0, window.innerHeight);
+      });
+      await page.waitForTimeout(2000);
+      
+      const keywords = await page.evaluate(() => {
+        const keywords = new Set<string>();
+        const videos = document.querySelectorAll('#video-title');
+        
+        videos.forEach(video => {
+          const title = (video as HTMLElement).textContent?.trim();
+          if (title) {
+            title.split(/[\s\-]+/).forEach(word => {
+              if (word.length > 3) keywords.add(word.toLowerCase());
+            });
+          }
+        });
+        
+        // Get from "People also searched for"
+        const relatedSearches = document.querySelectorAll('#related-searches a');
+        relatedSearches.forEach(el => {
+          const text = (el as HTMLElement).textContent?.trim();
+          if (text) keywords.add(text.toLowerCase());
+        });
+        
+        return Array.from(keywords);
+      });
+      
+      return keywords.map(keyword => ({
+        keyword,
+        volume: 0,
+        competition: 0,
+        cpc: 0,
+        trend: 0
+      }));
+    } finally {
+      await browser.close();
+    }
+  }
+
+  private async scrapeYouTubeRelated(keyword: string, country: string): Promise<KeywordData[]> {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    try {
+      const page = await browser.newPage();
+      await page.setUserAgent(this.getRandomUserAgent());
+      await page.setExtraHTTPHeaders({
+        'Accept-Language': `en-${country},en;q=0.9`
+      });
+      
+      await page.goto(`https://www.youtube.com/results?search_query=${encodeURIComponent(keyword)}`, {
+        waitUntil: 'networkidle2',
+        timeout: 30000
+      });
+      
+      // Click on first video to get related keywords
+      await page.click('#video-title');
+      await page.waitForNavigation();
+      
+      const relatedKeywords = await page.evaluate(() => {
+        const keywords = new Set<string>();
+        
+        // Get from video title
+        const title = document.querySelector('h1.title')?.textContent;
+        if (title) {
+          title.split(/[\s\-]+/).forEach(word => {
+            if (word.length > 3) keywords.add(word.toLowerCase());
+          });
+        }
+        
+        // Get from description
+        const description = document.querySelector('#description')?.textContent;
+        if (description) {
+          description.split(/[\s\-]+/).forEach(word => {
+            if (word.length > 3) keywords.add(word.toLowerCase());
+          });
+        }
+        
+        // Get from related videos
+        const relatedVideos = document.querySelectorAll('#items #video-title');
+        relatedVideos.forEach(video => {
+          const text = (video as HTMLElement).textContent?.trim();
+          if (text) {
+            text.split(/[\s\-]+/).forEach(word => {
+              if (word.length > 3) keywords.add(word.toLowerCase());
+            });
+          }
+        });
+        
+        return Array.from(keywords);
+      });
+      
+      return relatedKeywords.map(keyword => ({
+        keyword,
+        volume: 0,
+        competition: 0,
+        cpc: 0,
+        trend: 0
+      }));
+    } finally {
+      await browser.close();
+    }
+  }
+
+  private async analyzeAmazonKeywords(keywords: KeywordData[], country: string): Promise<KeywordData[]> {
+    const analyzed: KeywordData[] = [];
+    
+    // Process in batches to avoid rate limiting
+    const batchSize = 3;
+    for (let i = 0; i < keywords.length; i += batchSize) {
+      const batch = keywords.slice(i, i + batchSize);
+      const batchResults = await Promise.all(
+        batch.map(kw => this.analyzeSingleAmazonKeyword(kw, country))
+      );
+      analyzed.push(...batchResults);
+      
+      // Add delay between batches
+      if (i + batchSize < keywords.length) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+    
+    return analyzed;
+  }
+
+  private async analyzeSingleAmazonKeyword(keywordData: KeywordData, country: string): Promise<KeywordData> {
+    try {
+      const amazonDomain = this.getAmazonDomain(country);
+      const response = await axios.get(`https://${amazonDomain}/s?k=${encodeURIComponent(keywordData.keyword)}`, {
+        headers: { 'User-Agent': this.getRandomUserAgent() },
+        timeout: 15000
+      });
+      
+      const $ = cheerio.load(response.data);
+      
+      // Estimate volume based on number of results
+      const resultsText = $('.s-result-count').text();
+      const resultsMatch = resultsText.match(/over (\d+(,\d+)* results/) || resultsText.match(/(\d+(,\d+)* results/);
+      let volume = 0;
+      if (resultsMatch) {
+        volume = parseInt(resultsMatch[1].replace(/,/g, '')) || 0;
+      }
+      
+      // Estimate competition based on sponsored results
+      const sponsoredCount = $('.s-sponsored-result').length;
+      const competition = Math.min(Math.round((sponsoredCount / 10) * 100), 100);
+      
+      // Estimate CPC (Amazon-specific heuristic)
+      const cpc = this.estimateAmazonCPC(keywordData.keyword);
+      
+      // Get first position product
+      const firstProduct = $('.s-result-item').first();
+      const firstPositionUrl = firstProduct.find('h2 a').attr('href');
+      const firstPositionTitle = firstProduct.find('h2 a span').text().trim();
+      
+      return {
+        ...keywordData,
+        volume,
+        competition,
+        cpc,
+        trend: 0, // Would need historical data for accurate trend
+        firstPositionUrl: firstPositionUrl ? `https://${amazonDomain}${firstPositionUrl}` : undefined,
+        firstPositionTitle
+      };
+    } catch (error) {
+      console.error(`Error analyzing Amazon keyword ${keywordData.keyword}:`, error);
+      return keywordData;
+    }
+  }
+
+  private async analyzeYouTubeKeywords(keywords: KeywordData[], country: string): Promise<KeywordData[]> {
+    const analyzed: KeywordData[] = [];
+    
+    // Process in batches to avoid rate limiting
+    const batchSize = 3;
+    for (let i = 0; i < keywords.length; i += batchSize) {
+      const batch = keywords.slice(i, i + batchSize);
+      const batchResults = await Promise.all(
+        batch.map(kw => this.analyzeSingleYouTubeKeyword(kw, country))
+      );
+      analyzed.push(...batchResults);
+      
+      // Add delay between batches
+      if (i + batchSize < keywords.length) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+    }
+    
+    return analyzed;
+  }
+
+  private async analyzeSingleYouTubeKeyword(keywordData: KeywordData, country: string): Promise<KeywordData> {
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    
+    try {
+      const page = await browser.newPage();
+      await page.setUserAgent(this.getRandomUserAgent());
+      await page.setExtraHTTPHeaders({
+        'Accept-Language': `en-${country},en;q=0.9`
+      });
+      
+      await page.goto(`https://www.youtube.com/results?search_query=${encodeURIComponent(keywordData.keyword)}`, {
+        waitUntil: 'networkidle2',
+        timeout: 30000
+      });
+      
+      // Scroll to load more results
+      await page.evaluate(() => {
+        window.scrollBy(0, window.innerHeight);
+      });
+      await page.waitForTimeout(2000);
+      
+      const keywordMetrics = await page.evaluate(() => {
+        // Estimate volume based on view counts
+        const viewCounts = Array.from(document.querySelectorAll('#metadata-line span'))
+          .map(el => {
+            const text = (el as HTMLElement).textContent?.trim() || '';
+            const views = text.replace(/[^\d]/g, '');
+            return parseInt(views) || 0;
+          });
+        
+        const totalViews = viewCounts.reduce((sum, views) => sum + views, 0);
+        const avgViews = viewCounts.length > 0 ? totalViews / viewCounts.length : 0;
+        
+        // Estimate competition based on channel diversity
+        const channels = new Set<string>();
+        document.querySelectorAll('#channel-info a').forEach(el => {
+          const channel = (el as HTMLElement).textContent?.trim();
+          if (channel) channels.add(channel);
+        });
+        
+        const competition = Math.min(Math.round((1 - (channels.size / 10)) * 100), 100);
+        
+        // Get first position video
+        const firstVideo = document.querySelector('#video-title');
+        const firstPositionUrl = firstVideo?.getAttribute('href');
+        const firstPositionTitle = firstVideo?.textContent?.trim();
+        
+        return {
+          volume: Math.round(avgViews),
+          competition,
+          firstPositionUrl: firstPositionUrl ? `https://www.youtube.com${firstPositionUrl}` : undefined,
+          firstPositionTitle
+        };
+      });
+      
+      // Estimate CPC (YouTube-specific heuristic)
+      const cpc = this.estimateYouTubeCPC(keywordData.keyword);
+      
+      return {
+        ...keywordData,
+        volume: keywordMetrics.volume,
+        competition: keywordMetrics.competition,
+        cpc,
+        trend: 0, // Would need historical data for accurate trend
+        firstPositionUrl: keywordMetrics.firstPositionUrl,
+        firstPositionTitle: keywordMetrics.firstPositionTitle
+      };
+    } finally {
+      await browser.close();
+    }
+  }
+
+  private estimateAmazonCPC(keyword: string): number {
+    // Simple heuristic based on keyword characteristics
+    const isCommercial = ['buy', 'price', 'cheap', 'deal', 'discount', 'review'].some(w => keyword.includes(w));
+    const wordCount = keyword.split(' ').length;
+    
+    let cpc = isCommercial ? 1.5 : 0.5;
+    
+    if (wordCount === 1) cpc *= 2;
+    else if (wordCount === 2) cpc *= 1.5;
+    
+    return parseFloat(cpc.toFixed(2));
+  }
+
+  private estimateYouTubeCPC(keyword: string): number {
+    // Simple heuristic based on keyword characteristics
+    const isCommercial = ['review', 'tutorial', 'how to', 'guide', 'best'].some(w => keyword.includes(w));
+    const wordCount = keyword.split(' ').length;
+    
+    let cpc = isCommercial ? 0.8 : 0.3;
+    
+    if (wordCount === 1) cpc *= 1.5;
+    else if (wordCount === 2) cpc *= 1.2;
+    
+    return parseFloat(cpc.toFixed(2));
+  }
+
+  private deduplicateKeywords(keywords: KeywordData[]): KeywordData[] {
+    const unique = new Map<string, KeywordData>();
+    
+    for (const kw of keywords) {
+      if (!unique.has(kw.keyword)) {
+        unique.set(kw.keyword, kw);
+      }
+    }
+    
+    return Array.from(unique.values());
+  }
+
+  private getAmazonDomain(country: string): string {
+    const domains: Record<string, string> = {
+      'us': 'amazon.com',
+      'uk': 'amazon.co.uk',
+      'ca': 'amazon.ca',
+      'de': 'amazon.de',
+      'fr': 'amazon.fr',
+      'it': 'amazon.it',
+      'es': 'amazon.es',
+      'jp': 'amazon.co.jp',
+      'in': 'amazon.in',
+      'br': 'amazon.com.br',
+      'mx': 'amazon.com.mx',
+      'au': 'amazon.com.au'
+    };
+    
+    return domains[country.toLowerCase()] || 'amazon.com';
+  }
+}
